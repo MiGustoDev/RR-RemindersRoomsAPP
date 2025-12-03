@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Trash2, Save, X, Calendar, Clock, Send, Loader2, AlertTriangle } from 'lucide-react';
-import { supabase, type Reminder, type ReminderComment } from '../lib/supabase';
+import { Pencil, Trash2, Save, X, Calendar, Clock, Send, Loader2, AlertTriangle, User, Flag } from 'lucide-react';
+import { supabase, type Reminder, type ReminderComment, type Priority } from '../lib/supabase';
 
 interface ReminderCardProps {
   reminder: Reminder;
-  onUpdate: (id: string, title: string, description: string, dueDate: string | null) => Promise<void>;
+  onUpdate: (id: string, title: string, description: string, dueDate: string | null, priority?: Priority, assignedTo?: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   isExpired?: boolean;
   isExpanded?: boolean;
@@ -27,6 +27,8 @@ export function ReminderCard({
   const [title, setTitle] = useState(reminder.title);
   const [description, setDescription] = useState(reminder.description);
   const [dueDate, setDueDate] = useState(reminder.due_date ? reminder.due_date.split('T')[0] : '');
+  const [priority, setPriority] = useState<Priority>(reminder.priority || 'medium');
+  const [assignedTo, setAssignedTo] = useState(reminder.assigned_to || '');
   const [isLoading, setIsLoading] = useState(false);
   const [comments, setComments] = useState<ReminderComment[]>([]);
   const [areCommentsLoading, setAreCommentsLoading] = useState(false);
@@ -44,7 +46,7 @@ export function ReminderCard({
 
     setIsLoading(true);
     try {
-      await onUpdate(reminder.id, title, description, dueDate || null);
+      await onUpdate(reminder.id, title, description, dueDate || null, priority, assignedTo || null);
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating reminder:', error);
@@ -57,7 +59,29 @@ export function ReminderCard({
     setTitle(reminder.title);
     setDescription(reminder.description);
     setDueDate(reminder.due_date ? reminder.due_date.split('T')[0] : '');
+    setPriority(reminder.priority || 'medium');
+    setAssignedTo(reminder.assigned_to || '');
     setIsEditing(false);
+  };
+
+  const getPriorityColor = (p: Priority) => {
+    switch (p) {
+      case 'urgent': return 'bg-red-500 border-red-600 text-white';
+      case 'high': return 'bg-orange-500 border-orange-600 text-white';
+      case 'medium': return 'bg-yellow-500 border-yellow-600 text-white';
+      case 'low': return 'bg-blue-500 border-blue-600 text-white';
+      default: return 'bg-gray-500 border-gray-600 text-white';
+    }
+  };
+
+  const getPriorityLabel = (p: Priority) => {
+    switch (p) {
+      case 'urgent': return 'Urgente';
+      case 'high': return 'Alta';
+      case 'medium': return 'Media';
+      case 'low': return 'Baja';
+      default: return 'Media';
+    }
   };
 
   const handleDelete = async () => {
@@ -206,12 +230,27 @@ useEffect(() => {
     onOpenDetails?.(reminder);
   };
 
+  const getPriorityBorderColor = (p: Priority) => {
+    switch (p) {
+      case 'urgent': return 'border-red-500 dark:border-red-600';
+      case 'high': return 'border-orange-500 dark:border-orange-600';
+      case 'medium': return 'border-yellow-500 dark:border-yellow-600';
+      case 'low': return 'border-blue-500 dark:border-blue-600';
+      default: return 'border-gray-300 dark:border-gray-600';
+    }
+  };
+
+  const currentPriority = reminder.priority || 'medium';
+  const borderColor = isExpired || isOverdue 
+    ? 'border-red-500 dark:border-red-600' 
+    : getPriorityBorderColor(currentPriority);
+
   return (
     <div
-      className={`flex-shrink-0 ${isExpanded ? 'w-full max-w-3xl' : 'w-72'} rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-2
+      className={`flex-shrink-0 ${isExpanded ? 'w-full max-w-3xl' : 'w-72'} rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-2 ${borderColor}
       ${isExpired || isOverdue
-        ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-800'
-        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+        ? 'bg-red-50 dark:bg-red-900/20'
+        : 'bg-white dark:bg-gray-800'
       } cursor-pointer`}
       onClick={handleCardClick}
     >
@@ -243,11 +282,42 @@ useEffect(() => {
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="mb-3 px-3 py-2 border-2 border-blue-500 dark:border-blue-400 rounded-lg
+              className="mb-2 px-3 py-2 border-2 border-blue-500 dark:border-blue-400 rounded-lg
                 focus:outline-none focus:border-blue-600 dark:focus:border-blue-300
                 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               disabled={isLoading}
             />
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Prioridad</label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as Priority)}
+                  className="w-full px-3 py-2 border-2 border-blue-500 dark:border-blue-400 rounded-lg
+                    focus:outline-none focus:border-blue-600 dark:focus:border-blue-300
+                    bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                  disabled={isLoading}
+                >
+                  <option value="low">Baja</option>
+                  <option value="medium">Media</option>
+                  <option value="high">Alta</option>
+                  <option value="urgent">Urgente</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Asignado a</label>
+                <input
+                  type="text"
+                  value={assignedTo}
+                  onChange={(e) => setAssignedTo(e.target.value)}
+                  placeholder="Nombre del responsable"
+                  className="w-full px-3 py-2 border-2 border-blue-500 dark:border-blue-400 rounded-lg
+                    focus:outline-none focus:border-blue-600 dark:focus:border-blue-300
+                    bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
@@ -272,9 +342,21 @@ useEffect(() => {
         ) : (
           <>
             <div className="border-b-2 border-gray-200 dark:border-gray-600 pb-3 mb-3">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 break-words line-clamp-2">
-                {reminder.title}
-              </h3>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 break-words line-clamp-2 flex-1">
+                  {reminder.title}
+                </h3>
+                <span className={`px-2 py-1 rounded-lg text-xs font-semibold border-2 flex-shrink-0 ${getPriorityColor(reminder.priority || 'medium')}`}>
+                  <Flag size={12} className="inline mr-1" />
+                  {getPriorityLabel(reminder.priority || 'medium')}
+                </span>
+              </div>
+              {reminder.assigned_to && (
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  <User size={14} />
+                  <span className="font-medium">{reminder.assigned_to}</span>
+                </div>
+              )}
             </div>
 
             <div className="border-b-2 border-gray-200 dark:border-gray-600 pb-3 mb-3 flex-1">

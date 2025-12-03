@@ -1,14 +1,20 @@
-import { Search, X, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
+import { Search, X, SlidersHorizontal, ArrowUpDown, Filter } from 'lucide-react';
+import type { Priority } from '../lib/supabase';
 
 interface SearchBarProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
   filterBy: 'all' | 'active' | 'expired' | 'today' | 'week';
   onFilterChange: (filter: 'all' | 'active' | 'expired' | 'today' | 'week') => void;
-  sortBy: 'created' | 'due_date' | 'title';
-  onSortChange: (sort: 'created' | 'due_date' | 'title') => void;
+  sortBy: 'created' | 'due_date' | 'title' | 'priority';
+  onSortChange: (sort: 'created' | 'due_date' | 'title' | 'priority') => void;
   sortOrder: 'asc' | 'desc';
   onSortOrderChange: (order: 'asc' | 'desc') => void;
+  priorityFilter?: Priority | 'all';
+  onPriorityFilterChange?: (priority: Priority | 'all') => void;
+  assignedToFilter?: string;
+  onAssignedToFilterChange?: (assignedTo: string) => void;
+  availableAssignees?: string[];
 }
 
 export function SearchBar({
@@ -19,7 +25,12 @@ export function SearchBar({
   sortBy,
   onSortChange,
   sortOrder,
-  onSortOrderChange
+  onSortOrderChange,
+  priorityFilter = 'all',
+  onPriorityFilterChange,
+  assignedToFilter = '',
+  onAssignedToFilterChange,
+  availableAssignees = []
 }: SearchBarProps) {
   return (
     <div className="space-y-3">
@@ -62,6 +73,43 @@ export function SearchBar({
           </select>
         </div>
 
+        {onPriorityFilterChange && (
+          <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+            <Filter size={18} className="text-gray-500 dark:text-gray-400" />
+            <select
+              value={priorityFilter}
+              onChange={(e) => onPriorityFilterChange(e.target.value as Priority | 'all')}
+              className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
+                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium
+                focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+            >
+              <option value="all">Todas las prioridades</option>
+              <option value="urgent">Urgente</option>
+              <option value="high">Alta</option>
+              <option value="medium">Media</option>
+              <option value="low">Baja</option>
+            </select>
+          </div>
+        )}
+
+        {onAssignedToFilterChange && (
+          <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+            <Filter size={18} className="text-gray-500 dark:text-gray-400" />
+            <select
+              value={assignedToFilter}
+              onChange={(e) => onAssignedToFilterChange(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
+                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium
+                focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+            >
+              <option value="">Todos los responsables</option>
+              {availableAssignees.map((assignee) => (
+                <option key={assignee} value={assignee}>{assignee}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 flex-1 min-w-[200px]">
           <ArrowUpDown size={18} className="text-gray-500 dark:text-gray-400" />
           <select
@@ -74,6 +122,7 @@ export function SearchBar({
             <option value="created">Fecha de creación</option>
             <option value="due_date">Fecha de vencimiento</option>
             <option value="title">Título</option>
+            <option value="priority">Prioridad</option>
           </select>
           <button
             onClick={() => onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc')}
