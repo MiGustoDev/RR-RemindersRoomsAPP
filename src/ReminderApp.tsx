@@ -738,7 +738,7 @@ export function ReminderApp() {
 
   if (!roomCode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-all duration-300">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-all duration-300 flex flex-col">
         {/* Header con Logo y Logout - Full Width */}
         <div className="flex justify-between items-center px-6 py-6">
           <img
@@ -756,7 +756,7 @@ export function ReminderApp() {
           </button>
         </div>
 
-        <div className="max-w-5xl mx-auto px-6 space-y-10 pb-12">
+        <div className="max-w-5xl mx-auto px-6 space-y-10 pb-12 flex-1 w-full">
           {lobbyHeader}
 
           {lastRoomCode && (
@@ -900,6 +900,10 @@ export function ReminderApp() {
             </div>
           </div>
         </div>
+
+        <footer className="w-full py-4 text-center text-[10px] md:text-xs text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-black/20 backdrop-blur-sm mt-auto">
+          © Desarrollado por el <a href="https://waveframe.com.ar/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Departamento de Sistemas</a> de Mi Gusto | Todos los derechos reservados.
+        </footer>
 
         {showAccessPrompt && roomPendingAccess && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
@@ -1260,6 +1264,10 @@ export function ReminderApp() {
             </div>
           )}
         </div>
+
+        <footer className="w-full py-4 text-center text-[10px] md:text-xs text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-t border-gray-200 dark:border-gray-700">
+          © Desarrollado por el <a href="https://waveframe.com.ar/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Departamento de Sistemas</a> de Mi Gusto | Todos los derechos reservados.
+        </footer>
       </div>
 
       {expandedReminder && (
