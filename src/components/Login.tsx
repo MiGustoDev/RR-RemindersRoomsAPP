@@ -3,11 +3,7 @@ import { LogIn, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface LoginProps {
-<<<<<<< HEAD
-  onLoginSuccess: (email: string) => void;
-=======
   onLoginSuccess: () => void;
->>>>>>> 0ff6dc08f46330f8804656403bab9a1ebbf122e3
 }
 
 export function Login({ onLoginSuccess }: LoginProps) {
@@ -23,7 +19,6 @@ export function Login({ onLoginSuccess }: LoginProps) {
     setIsLoading(true);
 
     try {
-<<<<<<< HEAD
       const emailTrimmed = email.trim().toLowerCase();
 
       // Autenticar con Supabase
@@ -34,7 +29,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
 
       if (authError) {
         console.error('❌ Error de autenticación:', authError);
-        
+
         // Mensajes de error más específicos
         if (authError.message.includes('Invalid login credentials')) {
           setError('Credenciales incorrectas. Verifica tu email y contraseña.');
@@ -51,25 +46,11 @@ export function Login({ onLoginSuccess }: LoginProps) {
         // Guardar en localStorage para compatibilidad
         localStorage.setItem('reminder:user', data.user.email || emailTrimmed);
         localStorage.setItem('reminder:logged-in', 'true');
-        onLoginSuccess(data.user.email || emailTrimmed);
+        onLoginSuccess();
       }
     } catch (err: any) {
       console.error('❌ Error inesperado:', err);
       setError('Ocurrió un error inesperado. Intenta nuevamente.');
-=======
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        onLoginSuccess();
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión. Verifica tus credenciales.');
->>>>>>> 0ff6dc08f46330f8804656403bab9a1ebbf122e3
     } finally {
       setIsLoading(false);
     }
@@ -87,11 +68,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
             </div>
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-<<<<<<< HEAD
                 Reminders & Rooms
-=======
-                Reminder
->>>>>>> 0ff6dc08f46330f8804656403bab9a1ebbf122e3
               </h1>
               <p className="text-sm text-gray-400 mt-1">
                 Inicia sesión para acceder a tus recordatorios
@@ -118,10 +95,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
                   placeholder="tu@email.com"
                   required
                   disabled={isLoading}
-<<<<<<< HEAD
                   autoComplete="email"
-=======
->>>>>>> 0ff6dc08f46330f8804656403bab9a1ebbf122e3
                   className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-gray-700 bg-gray-900 text-gray-100 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-900 outline-none transition-all disabled:opacity-50"
                 />
               </div>
@@ -144,10 +118,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
                   placeholder="••••••••"
                   required
                   disabled={isLoading}
-<<<<<<< HEAD
                   autoComplete="current-password"
-=======
->>>>>>> 0ff6dc08f46330f8804656403bab9a1ebbf122e3
                   className="w-full pl-12 pr-12 py-3 rounded-xl border-2 border-gray-700 bg-gray-900 text-gray-100 placeholder-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-900 outline-none transition-all disabled:opacity-50"
                 />
                 <button
@@ -163,11 +134,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
 
             {/* Error message */}
             {error && (
-<<<<<<< HEAD
               <div className="p-3 rounded-xl bg-red-900/20 border border-red-800 animate-shake">
-=======
-              <div className="p-3 rounded-xl bg-red-900/20 border border-red-800">
->>>>>>> 0ff6dc08f46330f8804656403bab9a1ebbf122e3
                 <p className="text-sm text-red-400 text-center">{error}</p>
               </div>
             )}
@@ -191,10 +158,6 @@ export function Login({ onLoginSuccess }: LoginProps) {
               )}
             </button>
           </form>
-<<<<<<< HEAD
-
-=======
->>>>>>> 0ff6dc08f46330f8804656403bab9a1ebbf122e3
         </div>
 
         {/* Footer */}
@@ -205,7 +168,3 @@ export function Login({ onLoginSuccess }: LoginProps) {
     </div>
   );
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> 0ff6dc08f46330f8804656403bab9a1ebbf122e3
