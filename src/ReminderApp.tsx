@@ -739,7 +739,24 @@ export function ReminderApp() {
   if (!roomCode) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-all duration-300">
-        <div className="max-w-5xl mx-auto py-12 px-6 space-y-10">
+        {/* Header con Logo y Logout - Full Width */}
+        <div className="flex justify-between items-center px-6 py-6">
+          <img
+            src="/Logo Mi Gusto 2025.png"
+            alt="Logo Mi Gusto"
+            className="h-16 w-auto object-contain drop-shadow-md"
+          />
+          <button
+            onClick={() => signOut()}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm"
+            title="Cerrar sesión"
+          >
+            <LogOut size={18} />
+            Cerrar sesión
+          </button>
+        </div>
+
+        <div className="max-w-5xl mx-auto px-6 space-y-10 pb-12">
           {lobbyHeader}
 
           {lastRoomCode && (
@@ -956,13 +973,15 @@ export function ReminderApp() {
         <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-b-2 border-gray-200 dark:border-gray-700 px-6 py-4 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-3">
+              <img
+                src="/Logo Mi Gusto 2025.png"
+                alt="Logo Mi Gusto"
+                className="h-10 w-auto object-contain"
+              />
+              <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700">
                 {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
               </div>
-              <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                Reminder
-              </h1>
               <div className="hidden sm:block w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700">
