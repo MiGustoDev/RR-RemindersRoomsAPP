@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Plus, Moon, Sun, Settings, Minimize2, Maximize2, BarChart3, Users, Copy, X, Lock, Unlock, DoorOpen, LogOut } from 'lucide-react';
+import { Plus, Moon, Sun, Settings, Minimize2, Maximize2, BarChart3, Users, Copy, X, Lock, Unlock, DoorOpen, LogOut, Calendar, Grid } from 'lucide-react';
 import { supabase, type Reminder, type Room, type Priority } from './lib/supabase';
 import { ReminderCard } from './components/ReminderCard';
 import { ExpiredPanel } from './components/ExpiredPanel';
 import { SettingsModal } from './components/SettingsModal';
 import { SearchBar } from './components/SearchBar';
 import { StatsPanel } from './components/StatsPanel';
+import { PersonSelector } from './components/PersonSelector';
+import { PeopleManager } from './components/PeopleManager';
+import { TagSelector } from './components/TagSelector';
+import { CalendarView } from './components/CalendarView';
 import { useAuth } from './lib/auth';
 import { useDarkMode } from './lib/theme';
 
@@ -20,19 +24,24 @@ export function ReminderApp() {
   const [newDescription, setNewDescription] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
   const [newPriority, setNewPriority] = useState<Priority>('medium');
-  const [newAssignedTo, setNewAssignedTo] = useState('');
+  const [newAssignedTo, setNewAssignedTo] = useState<string | null>(null);
+  const [newTags, setNewTags] = useState<string[]>([]);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [roomInfo, setRoomInfo] = useState<Room | null>(null);
   const [isDark, setIsDark] = useDarkMode();
   const [showExpiredPanel, setShowExpiredPanel] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showPeopleManager, setShowPeopleManager] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'calendar'>('cards');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBy, setFilterBy] = useState<'all' | 'active' | 'expired' | 'today' | 'week'>('all');
   const [sortBy, setSortBy] = useState<'created' | 'due_date' | 'title' | 'priority'>('created');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
   const [assignedToFilter, setAssignedToFilter] = useState('');
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string>('');
+  const [availableTags, setAvailableTags] = useState<Array<{ id: string; name: string; color: string }>>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [isRoomsLoading, setIsRoomsLoading] = useState(true);
   const [roomsError, setRoomsError] = useState<string | null>(null);
@@ -69,12 +78,35 @@ export function ReminderApp() {
     };
   }, [user]);
 
+  const fetchAvailableTags = async (targetRoomCode: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('reminder_tags')
+        .select('id, name, color')
+        .eq('room_code', targetRoomCode)
+        .order('name', { ascending: true });
+
+      if (error) {
+        // Si no existe la tabla, simplemente no cargar tags
+        // No mostrar error en consola para evitar ruido
+        setAvailableTags([]);
+        return;
+      }
+      setAvailableTags(data || []);
+    } catch (err) {
+      // Si no existe la tabla, simplemente no cargar tags
+      // Silenciar el error para evitar problemas de renderizado
+      setAvailableTags([]);
+    }
+  };
+
   useEffect(() => {
     if (!roomCode) return;
 
     localStorage.setItem(ROOM_STORAGE_KEY, roomCode);
     fetchRoomInfo(roomCode);
     fetchReminders(roomCode);
+    fetchAvailableTags(roomCode);
 
     const channel = supabase
       .channel(`reminders-${roomCode}`)
@@ -121,9 +153,10 @@ export function ReminderApp() {
         setIsAddingNew(false);
         setNewTitle('');
         setNewDescription('');
-        setNewDueDate('');
-        setNewPriority('medium');
-        setNewAssignedTo('');
+                        setNewDueDate('');
+                        setNewPriority('medium');
+                        setNewAssignedTo(null);
+                        setNewTags([]);
       }
     };
 
@@ -417,16 +450,68 @@ export function ReminderApp() {
 
       if (error) throw error;
 
-      const normalizedReminders = (data || []).map((reminder: any) => ({
-        ...reminder,
-        priority: reminder.priority || 'medium',
-        assigned_to: reminder.assigned_to || null,
-        progress: reminder.progress ?? 0,
-      }));
+      // Cargar etiquetas para cada recordatorio (con manejo de errores robusto)
+      // Usar Promise.allSettled para que un error en un recordatorio no rompa todos
+      const remindersWithTags = await Promise.allSettled(
+        (data || []).map(async (reminder: any) => {
+          let tags: any[] = [];
+          try {
+            const { data: tagAssignments, error: tagError } = await supabase
+              .from('reminder_tag_assignments')
+              .select('tag_id')
+              .eq('reminder_id', reminder.id);
 
-      setReminders(normalizedReminders);
+            // Si hay error o no hay asignaciones, continuar sin tags
+            if (!tagError && tagAssignments && tagAssignments.length > 0) {
+              const tagIds = tagAssignments.map(ta => ta.tag_id);
+              const { data: tagsData, error: tagsError } = await supabase
+                .from('reminder_tags')
+                .select('*')
+                .in('id', tagIds);
+              
+              if (!tagsError && tagsData) {
+                tags = tagsData;
+              }
+            }
+          } catch (err) {
+            // Si no existen las tablas de tags, simplemente no cargar tags
+            // Silenciar el error
+          }
+
+          return {
+            ...reminder,
+            priority: reminder.priority || 'medium',
+            assigned_to: reminder.assigned_to || null,
+            progress: reminder.progress ?? 0,
+            tags: tags,
+          };
+        })
+      );
+
+      // Extraer los valores exitosos y manejar los rechazados
+      const successfulReminders = remindersWithTags
+        .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
+        .map(result => result.value);
+      
+      // Si hay algunos que fallaron, al menos mostrar los que funcionaron
+      if (successfulReminders.length === 0 && (data || []).length > 0) {
+        // Si todos fallaron, usar los datos sin tags
+        const normalizedReminders = (data || []).map((reminder: any) => ({
+          ...reminder,
+          priority: reminder.priority || 'medium',
+          assigned_to: reminder.assigned_to || null,
+          progress: reminder.progress ?? 0,
+          tags: [],
+        }));
+        setReminders(normalizedReminders);
+        return;
+      }
+
+      setReminders(successfulReminders);
     } catch (error) {
       console.error('Error fetching reminders:', error);
+      // Asegurar que siempre se establezcan los recordatorios, incluso si hay error
+      setReminders([]);
     } finally {
       if (toggleLoading) {
         setIsLoading(false);
@@ -438,50 +523,151 @@ export function ReminderApp() {
     if (!newTitle.trim() || !roomCode) return;
 
     try {
+      // Crear objeto de inserción básico primero
       const insertData: any = {
         title: newTitle.trim(),
-        description: newDescription.trim(),
+        description: newDescription.trim() || '',
         due_date: newDueDate || null,
         room_code: roomCode,
         progress: 0,
       };
 
+      // Intentar agregar priority solo si la columna existe
+      // Si no existe, se intentará sin ella y luego se actualizará
       try {
-        insertData.priority = newPriority;
-        insertData.assigned_to = newAssignedTo.trim() || null;
+        insertData.priority = newPriority || 'medium';
       } catch (e) {
-        console.warn('Campos priority/assigned_to no disponibles:', e);
+        console.warn('No se pudo agregar priority:', e);
       }
 
-      const { data, error } = await supabase
+      // Intentar insertar primero
+      let { data, error } = await supabase
         .from('reminders')
         .insert([insertData])
         .select()
         .single();
 
+      // Si hay error relacionado con priority, intentar sin ella
+      if (error && error.message && error.message.includes('priority')) {
+        console.warn('La columna priority no existe, intentando sin ella...');
+        delete insertData.priority;
+        const retryResult = await supabase
+          .from('reminders')
+          .insert([insertData])
+          .select()
+          .single();
+        data = retryResult.data;
+        error = retryResult.error;
+      }
+
+      // Si hay error, lanzarlo
       if (error) {
         console.error('Error de Supabase al crear:', error);
+        console.error('Datos que se intentaron insertar:', insertData);
         throw error;
       }
 
+      // Si la inserción fue exitosa, intentar actualizar priority y assigned_to si es necesario
       if (data) {
+        const updates: any = {};
+        let needsUpdate = false;
+
+        // Intentar actualizar priority si no se pudo insertar
+        if (insertData.priority && (!data.priority || data.priority !== insertData.priority)) {
+          updates.priority = insertData.priority;
+          needsUpdate = true;
+        }
+
+        // Intentar actualizar assigned_to si hay uno
+        if (newAssignedTo && (!data.assigned_to || data.assigned_to !== newAssignedTo)) {
+          updates.assigned_to = newAssignedTo;
+          needsUpdate = true;
+        }
+
+        // Si hay actualizaciones pendientes, intentarlas
+        if (needsUpdate) {
+          try {
+            const { error: updateError } = await supabase
+              .from('reminders')
+              .update(updates)
+              .eq('id', data.id);
+
+            if (updateError) {
+              // Si la columna no existe, simplemente continuar sin ella
+              if (updateError.message && (
+                updateError.message.includes('priority') || 
+                updateError.message.includes('assigned_to')
+              )) {
+                console.warn('Algunas columnas no existen en la base de datos:', updateError.message);
+              } else {
+                console.warn('No se pudieron aplicar las actualizaciones:', updateError);
+              }
+            } else {
+              // Recargar el recordatorio con las actualizaciones
+              const { data: updatedData } = await supabase
+                .from('reminders')
+                .select('*')
+                .eq('id', data.id)
+                .single();
+              if (updatedData) {
+                data = updatedData;
+              }
+            }
+          } catch (updateErr: any) {
+            console.warn('Error al actualizar campos adicionales:', updateErr);
+            // No es crítico, el recordatorio ya se creó
+          }
+        }
+
+        // Normalizar los datos del recordatorio
         const normalizedData = {
           ...data,
           priority: data.priority || 'medium',
           assigned_to: data.assigned_to || null,
           progress: data.progress ?? 0,
+          tags: [],
         };
+
+        // Asignar etiquetas si hay alguna seleccionada
+        if (newTags.length > 0 && roomCode) {
+          try {
+            const tagAssignments = newTags.map(tagId => ({
+              reminder_id: data.id,
+              tag_id: tagId,
+            }));
+
+            await supabase
+              .from('reminder_tag_assignments')
+              .insert(tagAssignments);
+
+            // Cargar las etiquetas para mostrarlas
+            const { data: tags } = await supabase
+              .from('reminder_tags')
+              .select('*')
+              .in('id', newTags);
+
+            normalizedData.tags = tags || [];
+          } catch (err) {
+            console.warn('No se pudieron asignar las etiquetas:', err);
+          }
+        }
+
         setReminders([normalizedData, ...reminders]);
         setNewTitle('');
         setNewDescription('');
         setNewDueDate('');
         setNewPriority('medium');
-        setNewAssignedTo('');
+        setNewAssignedTo(null);
+        setNewTags([]);
         setIsAddingNew(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding reminder:', error);
-      alert('Error al crear el recordatorio. Verifica que la base de datos tenga todas las columnas necesarias.');
+      const errorMessage = error?.message || 'Error desconocido';
+      const errorDetails = error?.details || '';
+      const errorHint = error?.hint || '';
+      
+      alert(`Error al crear el recordatorio:\n\n${errorMessage}${errorDetails ? `\n\nDetalles: ${errorDetails}` : ''}${errorHint ? `\n\nSugerencia: ${errorHint}` : ''}\n\nVerifica que la base de datos tenga todas las columnas necesarias.`);
     }
   };
 
@@ -669,6 +855,12 @@ export function ReminderApp() {
 
       if (assignedToFilter && reminder.assigned_to !== assignedToFilter) {
         return false;
+      }
+
+      // Filtro por etiquetas
+      if (selectedTagFilter) {
+        const hasTag = reminder.tags?.some(tag => tag.id === selectedTagFilter);
+        if (!hasTag) return false;
       }
 
       const now = new Date();
@@ -1025,6 +1217,18 @@ export function ReminderApp() {
 
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setViewMode(viewMode === 'cards' ? 'calendar' : 'cards')}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+                title={viewMode === 'cards' ? 'Vista calendario' : 'Vista tarjetas'}
+              >
+                {viewMode === 'cards' ? (
+                  <Calendar size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                ) : (
+                  <Grid size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                )}
+              </button>
+
+              <button
                 onClick={() => setShowStats(!showStats)}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
                 title="Estadísticas"
@@ -1111,6 +1315,9 @@ export function ReminderApp() {
                     assignedToFilter={assignedToFilter}
                     onAssignedToFilterChange={setAssignedToFilter}
                     availableAssignees={availableAssignees}
+                    tagFilter={selectedTagFilter}
+                    onTagFilterChange={setSelectedTagFilter}
+                    availableTags={availableTags}
                   />
                 </div>
               </div>
@@ -1180,17 +1387,23 @@ export function ReminderApp() {
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Asignado a</label>
-                      <input
-                        type="text"
+                      <PersonSelector
                         value={newAssignedTo}
-                        onChange={(e) => setNewAssignedTo(e.target.value)}
-                        placeholder="Responsable"
-                        className="w-full px-3 py-2 border-2 border-blue-500 dark:border-blue-400 rounded-lg
-                          focus:outline-none focus:border-blue-600 dark:focus:border-blue-300
-                          bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                        onChange={setNewAssignedTo}
+                        placeholder="Seleccionar responsable..."
                       />
                     </div>
                   </div>
+                  {roomCode && (
+                    <div className="mb-3">
+                      <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Etiquetas</label>
+                      <TagSelector
+                        roomCode={roomCode}
+                        selectedTags={newTags}
+                        onChange={setNewTags}
+                      />
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <button
                       onClick={handleAddReminder}
@@ -1208,7 +1421,8 @@ export function ReminderApp() {
                         setNewDescription('');
                         setNewDueDate('');
                         setNewPriority('medium');
-                        setNewAssignedTo('');
+                        setNewAssignedTo(null);
+                        setNewTags([]);
                       }}
                       className="flex-1 px-3 py-2 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg
                         hover:from-gray-600 hover:to-gray-700 transition-all text-sm font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -1234,6 +1448,13 @@ export function ReminderApp() {
                   <p className="text-xl font-medium text-gray-500 dark:text-gray-400">No hay recordatorios activos</p>
                   <p className="text-gray-400 dark:text-gray-500 mt-2">Presiona Ctrl+N para crear uno</p>
                 </div>
+              </div>
+            ) : viewMode === 'calendar' ? (
+              <div className="flex-1 overflow-y-auto px-6 pb-6">
+                <CalendarView
+                  reminders={activeReminders}
+                  onReminderClick={setExpandedReminder}
+                />
               </div>
             ) : (
               <div className="flex-1 overflow-x-auto overflow-y-hidden px-6 pb-6">
@@ -1296,6 +1517,12 @@ export function ReminderApp() {
         onClearAll={handleClearAll}
         onExport={handleExport}
         onImport={handleImport}
+        onOpenPeopleManager={() => setShowPeopleManager(true)}
+      />
+
+      <PeopleManager
+        isOpen={showPeopleManager}
+        onClose={() => setShowPeopleManager(false)}
       />
     </div>
   );

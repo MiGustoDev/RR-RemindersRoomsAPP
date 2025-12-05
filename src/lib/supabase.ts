@@ -51,6 +51,7 @@ export type Reminder = {
   progress: number;
   priority: Priority;
   assigned_to: string | null;
+  tags?: ReminderTag[];
 };
 
 export type ReminderTag = {
@@ -83,5 +84,12 @@ export type ReminderComment = {
   reminder_id: string;
   author: string;
   message: string;
+  created_at: string;
+};
+
+export type Person = {
+  id: string;
+  name: string;
+  email: string | null;
   created_at: string;
 };

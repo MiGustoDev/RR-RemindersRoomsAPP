@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Pencil, Trash2, Save, X, Calendar, Clock, Send, Loader2, AlertTriangle, User, Flag } from 'lucide-react';
-import { supabase, type Reminder, type ReminderComment, type Priority } from '../lib/supabase';
+import { supabase, type Reminder, type ReminderComment, type Priority, type Person } from '../lib/supabase';
+import { PersonSelector } from './PersonSelector';
+import { TagSelector } from './TagSelector';
 
 interface ReminderCardProps {
   reminder: Reminder;
@@ -28,7 +30,9 @@ export function ReminderCard({
   const [description, setDescription] = useState(reminder.description);
   const [dueDate, setDueDate] = useState(reminder.due_date ? reminder.due_date.split('T')[0] : '');
   const [priority, setPriority] = useState<Priority>(reminder.priority || 'medium');
-  const [assignedTo, setAssignedTo] = useState(reminder.assigned_to || '');
+  const [assignedTo, setAssignedTo] = useState<string | null>(reminder.assigned_to || null);
+  const [assignedPerson, setAssignedPerson] = useState<Person | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>(reminder.tags?.map(t => t.id) || []);
   const [isLoading, setIsLoading] = useState(false);
   const [comments, setComments] = useState<ReminderComment[]>([]);
   const [areCommentsLoading, setAreCommentsLoading] = useState(false);
@@ -41,12 +45,75 @@ export function ReminderCard({
   const [savedProgress, setSavedProgress] = useState(reminder.progress ?? 0);
   const [isProgressUpdating, setIsProgressUpdating] = useState(false);
 
+  // Cargar información de la persona asignada
+  useEffect(() => {
+    const loadAssignedPerson = async () => {
+      if (reminder.assigned_to) {
+        try {
+          const { data, error } = await supabase
+            .from('people')
+            .select('id, name, email, created_at')
+            .eq('id', reminder.assigned_to)
+            .single();
+
+          if (!error && data) {
+            setAssignedPerson(data);
+          }
+        } catch (err) {
+          // Si no existe la tabla o la persona, simplemente no mostrar nada
+          setAssignedPerson(null);
+        }
+      } else {
+        setAssignedPerson(null);
+      }
+    };
+
+    loadAssignedPerson();
+  }, [reminder.assigned_to]);
+
   const handleSave = async () => {
     if (!title.trim()) return;
 
     setIsLoading(true);
     try {
-      await onUpdate(reminder.id, title, description, dueDate || null, priority, assignedTo || null);
+      await onUpdate(reminder.id, title, description, dueDate || null, priority, assignedTo);
+      
+      // Actualizar etiquetas
+      if (reminder.room_code) {
+        try {
+          // Obtener etiquetas actuales
+          const { data: currentAssignments } = await supabase
+            .from('reminder_tag_assignments')
+            .select('tag_id')
+            .eq('reminder_id', reminder.id);
+
+          const currentTagIds = (currentAssignments || []).map(a => a.tag_id);
+          const tagsToAdd = selectedTags.filter(id => !currentTagIds.includes(id));
+          const tagsToRemove = currentTagIds.filter(id => !selectedTags.includes(id));
+
+          // Agregar nuevas etiquetas
+          if (tagsToAdd.length > 0) {
+            await supabase
+              .from('reminder_tag_assignments')
+              .insert(tagsToAdd.map(tagId => ({
+                reminder_id: reminder.id,
+                tag_id: tagId,
+              })));
+          }
+
+          // Eliminar etiquetas removidas
+          if (tagsToRemove.length > 0) {
+            await supabase
+              .from('reminder_tag_assignments')
+              .delete()
+              .eq('reminder_id', reminder.id)
+              .in('tag_id', tagsToRemove);
+          }
+        } catch (err) {
+          console.warn('No se pudieron actualizar las etiquetas:', err);
+        }
+      }
+
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating reminder:', error);
@@ -60,7 +127,8 @@ export function ReminderCard({
     setDescription(reminder.description);
     setDueDate(reminder.due_date ? reminder.due_date.split('T')[0] : '');
     setPriority(reminder.priority || 'medium');
-    setAssignedTo(reminder.assigned_to || '');
+    setAssignedTo(reminder.assigned_to || null);
+    setSelectedTags(reminder.tags?.map(t => t.id) || []);
     setIsEditing(false);
   };
 
@@ -306,18 +374,25 @@ useEffect(() => {
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Asignado a</label>
-                <input
-                  type="text"
+                <PersonSelector
                   value={assignedTo}
-                  onChange={(e) => setAssignedTo(e.target.value)}
-                  placeholder="Nombre del responsable"
-                  className="w-full px-3 py-2 border-2 border-blue-500 dark:border-blue-400 rounded-lg
-                    focus:outline-none focus:border-blue-600 dark:focus:border-blue-300
-                    bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                  onChange={setAssignedTo}
+                  placeholder="Seleccionar responsable..."
                   disabled={isLoading}
                 />
               </div>
             </div>
+            {reminder.room_code && (
+              <div className="mb-2">
+                <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Etiquetas</label>
+                <TagSelector
+                  roomCode={reminder.room_code}
+                  selectedTags={selectedTags}
+                  onChange={setSelectedTags}
+                  className="text-sm"
+                />
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
@@ -351,10 +426,25 @@ useEffect(() => {
                   {getPriorityLabel(reminder.priority || 'medium')}
                 </span>
               </div>
-              {reminder.assigned_to && (
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  <User size={14} />
-                  <span className="font-medium">{reminder.assigned_to}</span>
+              <div className={`flex items-center gap-2 text-sm mt-2 px-2 py-1 rounded-lg ${assignedPerson 
+                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' 
+                : 'text-gray-400 dark:text-gray-500'}`}>
+                <User size={14} />
+                <span className={assignedPerson ? 'font-semibold' : 'italic'}>
+                  {assignedPerson ? assignedPerson.name : 'Sin responsable asignado'}
+                </span>
+              </div>
+              {reminder.tags && reminder.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {reminder.tags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                      style={{ backgroundColor: tag.color }}
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>

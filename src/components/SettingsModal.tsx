@@ -1,4 +1,4 @@
-import { X, Moon, Sun, Bell, Trash2, Download, Upload } from 'lucide-react';
+import { X, Moon, Sun, Bell, Trash2, Download, Upload, Users } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -8,6 +8,7 @@ interface SettingsModalProps {
   onClearAll: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  onOpenPeopleManager?: () => void;
 }
 
 export function SettingsModal({
@@ -17,7 +18,8 @@ export function SettingsModal({
   onToggleDark,
   onClearAll,
   onExport,
-  onImport
+  onImport,
+  onOpenPeopleManager
 }: SettingsModalProps) {
   if (!isOpen) return null;
 
@@ -84,8 +86,21 @@ export function SettingsModal({
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Datos</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Gestión</h3>
             <div className="space-y-2">
+              {onOpenPeopleManager && (
+                <button
+                  onClick={() => {
+                    onOpenPeopleManager();
+                    onClose();
+                  }}
+                  className="w-full flex items-center gap-3 p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20
+                    hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-all text-purple-600 dark:text-purple-400"
+                >
+                  <Users size={20} />
+                  <span className="font-medium">Gestionar personas</span>
+                </button>
+              )}
               <button
                 onClick={onExport}
                 className="w-full flex items-center gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20

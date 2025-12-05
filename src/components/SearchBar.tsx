@@ -15,6 +15,9 @@ interface SearchBarProps {
   assignedToFilter?: string;
   onAssignedToFilterChange?: (assignedTo: string) => void;
   availableAssignees?: string[];
+  tagFilter?: string;
+  onTagFilterChange?: (tagId: string) => void;
+  availableTags?: Array<{ id: string; name: string; color: string }>;
 }
 
 export function SearchBar({
@@ -30,7 +33,10 @@ export function SearchBar({
   onPriorityFilterChange,
   assignedToFilter = '',
   onAssignedToFilterChange,
-  availableAssignees = []
+  availableAssignees = [],
+  tagFilter = '',
+  onTagFilterChange,
+  availableTags = []
 }: SearchBarProps) {
   return (
     <div className="space-y-3">
@@ -105,6 +111,24 @@ export function SearchBar({
               <option value="">Todos los responsables</option>
               {availableAssignees.map((assignee) => (
                 <option key={assignee} value={assignee}>{assignee}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {onTagFilterChange && availableTags.length > 0 && (
+          <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+            <Filter size={18} className="text-gray-500 dark:text-gray-400" />
+            <select
+              value={tagFilter}
+              onChange={(e) => onTagFilterChange(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
+                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium
+                focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+            >
+              <option value="">Todas las etiquetas</option>
+              {availableTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>{tag.name}</option>
               ))}
             </select>
           </div>
