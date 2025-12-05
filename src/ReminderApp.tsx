@@ -137,43 +137,36 @@ export function ReminderApp() {
     }
 
     try {
-      console.log('🔍 Intentando cargar salas...');
-
-      // Verificar variables de entorno primero
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
-        throw new Error('Variables de entorno no configuradas. Crea un archivo .env');
-      }
-
-      console.log('📡 Construyendo query SIMPLE (sin filtro de usuario)...');
-
       // Verificar que el usuario esté autenticado
       if (!user) {
-        console.log('⚠️ Usuario no autenticado - no se cargarán salas');
         setRooms([]);
         setRoomsError('Debes iniciar sesión para ver las salas');
         return;
       }
 
-      console.log('✅ Usuario autenticado:', user.email);
+      // Obtener el usuario actual de Supabase para asegurar que tenemos el ID
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        setRooms([]);
+        setRoomsError('No se pudo obtener la información del usuario.');
+        return;
+      }
 
-      // Consulta simple - mostrar TODAS las salas (sin filtro por usuario)
+      // Filtrar salas por user_id del usuario actual
       const { data, error } = await supabase
         .from('rooms')
-        .select('id, name, code, created_at, is_locked, created_by')
+        .select('id, name, code, created_at, is_locked, user_id')
+        .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false });
-      console.log('✔️ Query completada. Error:', error ? 'SÍ' : 'NO', 'Data:', data?.length || 0, 'salas');
 
       if (error) {
-        console.error('❌ Error de Supabase:', error);
-        console.error('📋 Código de error:', error.code);
-        console.error('📋 Mensaje:', error.message);
-        console.error('📋 Detalles:', error.details);
-        console.error('📋 Hint:', error.hint);
-
-        // Error específico para columna faltante (migración no aplicada)
+        // Error específico para columna faltante
         if (error.code === '42703') {
-          setRoomsError('Error de base de datos: Falta la columna "created_by". Ejecuta el archivo SQL_MIGRATION_ADD_OWNER.sql en Supabase.');
+          if (error.message?.includes('user_id')) {
+            setRoomsError('Error de base de datos: Falta la columna "user_id". Ejecuta la migración SQL en Supabase.');
+          } else {
+            setRoomsError('Error de base de datos. Verifica la estructura de la tabla rooms.');
+          }
           return;
         }
 
@@ -186,27 +179,21 @@ export function ReminderApp() {
           throw error;
         }
       } else {
-        console.log(`✅ Salas cargadas: ${data?.length || 0} (Usuario: ${user?.email || 'Anónimo'})`);
         setRooms(data || []);
         setRoomsError(null);
       }
     } catch (error: any) {
-      console.error('❌ Error al cargar salas:', error);
-
-      // Mostrar el error real en lugar de timeout genérico
+      // Mostrar el error real
       if (error.message?.includes('Variables de entorno')) {
         setRoomsError('Variables de entorno no configuradas. Crea un archivo .env con VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY');
       } else if (error.code === 'PGRST116' || error.code === '42P01' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
         setRoomsError('La tabla "rooms" no existe. Ejecuta SQL_COPIAR_AQUI.sql en Supabase SQL Editor.');
       } else if (error.code === 'PGRST301' || error.code === '42501' || error.message?.includes('permission') || error.message?.includes('RLS')) {
-        setRoomsError('Error de permisos. Ejecuta en Supabase: ALTER TABLE rooms DISABLE ROW LEVEL SECURITY;');
+        setRoomsError('Error de permisos. Verifica las políticas RLS en Supabase.');
       } else {
-        // Mostrar el error real de Supabase
-        const errorMsg = error.message || error.toString() || 'Error desconocido';
-        setRoomsError(`Error: ${errorMsg}. Revisa la consola (F12) para más detalles.`);
+        setRoomsError('No pudimos cargar las salas. Intenta nuevamente.');
       }
     } finally {
-      console.log('🏁 Finalizó carga de salas. Loading:', toggleLoading);
       if (toggleLoading) {
         setIsRoomsLoading(false);
       }
@@ -220,10 +207,18 @@ export function ReminderApp() {
 
   const fetchRoomInfo = async (code: string) => {
     try {
+      // Obtener el usuario actual
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        setRoomInfo(null);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('rooms')
-        .select('id, name, code, created_at, is_locked, created_by')
+        .select('id, name, code, created_at, is_locked, user_id')
         .eq('code', code)
+        .eq('user_id', currentUser.id)
         .single();
 
       if (error) throw error;
@@ -265,9 +260,9 @@ export function ReminderApp() {
             code,
             is_locked: Boolean(trimmedCode),
             access_code: trimmedCode || null,
-            created_by: user?.id || null,
+            user_id: user?.id || null,
           }])
-          .select('id, name, code, created_at, is_locked, created_by')
+          .select('id, name, code, created_at, is_locked, user_id')
           .single();
 
         if (error) {
@@ -337,7 +332,7 @@ export function ReminderApp() {
           code: data.code,
           created_at: data.created_at,
           is_locked: data.is_locked,
-          created_by: null,
+          user_id: data.user_id || null,
         };
         enterRoom(sanitizedRoom);
         setRoomPendingAccess(null);
@@ -381,14 +376,21 @@ export function ReminderApp() {
     }
 
     try {
+      // Obtener el usuario actual para verificar que la sala le pertenece
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        throw new Error('Usuario no autenticado');
+      }
+
       const { data, error } = await supabase
         .from('rooms')
-        .select('id, name, code, created_at, is_locked')
+        .select('id, name, code, created_at, is_locked, user_id')
         .eq('code', lastRoomCode)
+        .eq('user_id', currentUser.id)
         .single();
 
       if (error) throw error;
-      handleRoomCardClick({ ...data, created_by: null });
+      handleRoomCardClick(data);
     } catch (error) {
       console.error('No se pudo recuperar la sala guardada:', error);
       setRoomActionMessage('No encontramos la sala guardada. Selecciona otra de la lista.');

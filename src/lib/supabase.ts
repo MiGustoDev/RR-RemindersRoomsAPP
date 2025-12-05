@@ -71,7 +71,7 @@ export type Room = {
   code: string;
   created_at: string;
   is_locked: boolean;
-  created_by: string | null;
+  user_id: string | null;
 };
 
 export type RoomWithSecret = Room & {
