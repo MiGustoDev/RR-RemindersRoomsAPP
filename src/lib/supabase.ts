@@ -15,6 +15,13 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Verificar variables de entorno
 if (!supabaseUrl || !supabaseAnonKey) {
+<<<<<<< HEAD
+  console.error('❌ Error: Faltan variables de entorno de Supabase');
+  console.error('Verifica que tu archivo .env tenga:');
+  console.error('- VITE_SUPABASE_URL');
+  console.error('- VITE_SUPABASE_ANON_KEY');
+  throw new Error('Missing Supabase environment variables');
+=======
   console.error('❌ ERROR: Faltan variables de entorno de Supabase');
   console.error('Crea un archivo .env en la raíz del proyecto con:');
   console.error('VITE_SUPABASE_URL=https://tu-proyecto.supabase.co');
@@ -24,6 +31,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 } else {
   console.log('✅ Variables de entorno encontradas');
   console.log('URL:', supabaseUrl.substring(0, 30) + '...');
+>>>>>>> 0ff6dc08f46330f8804656403bab9a1ebbf122e3
 }
 
 // Crear cliente
