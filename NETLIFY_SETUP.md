@@ -33,15 +33,24 @@ Si ves el error `ERR_NAME_NOT_RESOLVED` al intentar iniciar sesión, significa q
 
 7. Haz clic en **Save** (Guardar)
 
-### Paso 3: Redesplegar tu sitio
+### Paso 3: ⚠️ REDESPLEGAR tu sitio (MUY IMPORTANTE)
+
+**CRÍTICO:** Después de agregar las variables de entorno, **DEBES hacer un nuevo deploy**. Las variables de entorno solo se inyectan durante el proceso de build, no en tiempo de ejecución.
 
 1. Ve a **Deploys** en el menú de tu sitio
 2. Haz clic en **Trigger deploy** > **Deploy site**
-3. Espera a que termine el build
+3. Espera a que termine el build (puede tardar 1-3 minutos)
+4. **NO** uses "Clear cache and deploy site" a menos que sea necesario
 
 ### Paso 4: Verificar
 
-Una vez que el deploy termine, recarga tu sitio y deberías poder iniciar sesión sin problemas.
+Una vez que el deploy termine:
+1. Recarga tu sitio (Ctrl+F5 o Cmd+Shift+R para forzar recarga)
+2. Abre la consola del navegador (F12)
+3. Deberías ver: `✅ Variables de entorno encontradas` y la URL de Supabase
+4. Intenta iniciar sesión
+
+Si aún ves el error `ERR_NAME_NOT_RESOLVED`, verifica la sección de Troubleshooting abajo.
 
 ## Configuración Local (Desarrollo)
 
@@ -63,4 +72,47 @@ URL: https://tu-proyecto.supabase...
 ```
 
 Si no están configuradas, verás un mensaje de error en la página.
+
+## Troubleshooting
+
+### Error persiste después de configurar variables
+
+Si después de agregar las variables y hacer un nuevo deploy sigues viendo `ERR_NAME_NOT_RESOLVED`:
+
+1. **Verifica que las variables estén correctamente escritas:**
+   - `VITE_SUPABASE_URL` (no `SUPABASE_URL`)
+   - `VITE_SUPABASE_ANON_KEY` (no `SUPABASE_ANON_KEY`)
+   - El prefijo `VITE_` es **obligatorio** para que Vite las inyecte en el build
+
+2. **Verifica los valores:**
+   - La URL debe empezar con `https://` y terminar con `.supabase.co`
+   - La key debe ser la clave **anon/public**, no la service_role key
+
+3. **Verifica el build:**
+   - Ve a **Deploys** y revisa los logs del último build
+   - Busca si hay errores relacionados con las variables
+   - Asegúrate de que el build se completó exitosamente
+
+4. **Limpia la caché y redespliega:**
+   - Ve a **Deploys**
+   - Haz clic en **Trigger deploy** > **Clear cache and deploy site**
+
+5. **Verifica en la consola del navegador:**
+   - Abre las herramientas de desarrollador (F12)
+   - Ve a la pestaña Console
+   - Deberías ver: `✅ Variables de entorno encontradas`
+   - Si ves un error sobre variables faltantes, las variables no se inyectaron correctamente
+
+### Verificar que las variables se inyectaron
+
+Para verificar que las variables se inyectaron correctamente en el build:
+
+1. Abre tu sitio en Netlify
+2. Abre las herramientas de desarrollador (F12)
+3. Ve a la pestaña **Network**
+4. Recarga la página
+5. Busca el archivo JavaScript principal (ej: `index-XXXXX.js`)
+6. Ábrelo y busca `VITE_SUPABASE_URL` - deberías ver tu URL de Supabase en el código
+
+Si no encuentras la URL en el código JavaScript, las variables no se inyectaron y necesitas verificar la configuración en Netlify.
 

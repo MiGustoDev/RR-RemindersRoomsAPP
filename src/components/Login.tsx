@@ -35,6 +35,8 @@ export function Login({ onLoginSuccess }: LoginProps) {
           setError('Credenciales incorrectas. Verifica tu email y contraseña.');
         } else if (authError.message.includes('Email not confirmed')) {
           setError('Por favor, confirma tu email antes de iniciar sesión.');
+        } else if (authError.message.includes('Failed to fetch') || authError.message.includes('ERR_NAME_NOT_RESOLVED')) {
+          setError('Error de conexión. Verifica que las variables de entorno estén configuradas en Netlify y que se haya hecho un nuevo deploy después de agregarlas.');
         } else {
           setError(authError.message || 'Error al iniciar sesión. Intenta nuevamente.');
         }
@@ -50,7 +52,15 @@ export function Login({ onLoginSuccess }: LoginProps) {
       }
     } catch (err: any) {
       console.error('❌ Error inesperado:', err);
-      setError('Ocurrió un error inesperado. Intenta nuevamente.');
+      
+      // Detectar errores de conexión
+      if (err?.message?.includes('Failed to fetch') || 
+          err?.message?.includes('ERR_NAME_NOT_RESOLVED') ||
+          err?.name === 'TypeError' && err?.message?.includes('fetch')) {
+        setError('Error de conexión con Supabase. Verifica que las variables de entorno estén configuradas correctamente en Netlify y que se haya hecho un nuevo deploy.');
+      } else {
+        setError('Ocurrió un error inesperado. Intenta nuevamente.');
+      }
     } finally {
       setIsLoading(false);
     }
