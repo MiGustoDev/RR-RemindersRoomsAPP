@@ -352,7 +352,7 @@ export function ReminderApp() {
     try {
       const { data, error } = await supabase
         .from('rooms')
-        .select('id, name, code, created_at, is_locked, access_code')
+        .select('id, name, code, created_at, is_locked, access_code, user_id')
         .eq('id', roomPendingAccess.id)
         .single();
 
@@ -387,6 +387,70 @@ export function ReminderApp() {
     setRoomPendingAccess(null);
     setAccessCodeInput('');
     setAccessError(null);
+  };
+
+  const handleToggleRoomPrivacy = async (room: Room, e?: React.MouseEvent) => {
+    // Prevenir que el click se propague al botón de la tarjeta
+    if (e) {
+      e.stopPropagation();
+    }
+
+    if (!user) {
+      setRoomActionMessage('Debes iniciar sesión para cambiar la privacidad de la sala.');
+      return;
+    }
+
+    // Verificar que el usuario sea el creador de la sala
+    if (room.user_id !== user.id) {
+      setRoomActionMessage('Solo el creador de la sala puede cambiar su privacidad.');
+      return;
+    }
+
+    setIsRoomActionLoading(true);
+    setRoomActionMessage(null);
+
+    try {
+      const newPrivacyStatus = !room.is_locked;
+
+      const { data, error } = await supabase
+        .from('rooms')
+        .update({ is_locked: newPrivacyStatus })
+        .eq('id', room.id)
+        .select('id, name, code, created_at, is_locked, user_id')
+        .single();
+
+      if (error) {
+        console.error('Error al cambiar privacidad:', error);
+        setRoomActionMessage('No se pudo cambiar la privacidad de la sala. Intenta nuevamente.');
+        return;
+      }
+
+      // Actualizar el estado local
+      setRooms((prevRooms) =>
+        prevRooms.map((r) => (r.id === room.id ? { ...r, is_locked: newPrivacyStatus } : r))
+      );
+
+      // Si es la sala actual, actualizar también roomInfo
+      if (roomCode === room.code && data) {
+        setRoomInfo(data);
+      }
+
+      setRoomActionMessage(
+        newPrivacyStatus
+          ? 'La sala ahora es privada. Los usuarios necesitarán el código de acceso.'
+          : 'La sala ahora es pública. Cualquiera puede acceder con el código de la sala.'
+      );
+
+      // Limpiar el mensaje después de 3 segundos
+      setTimeout(() => {
+        setRoomActionMessage(null);
+      }, 3000);
+    } catch (err) {
+      console.error('Error inesperado al cambiar privacidad:', err);
+      setRoomActionMessage('Ocurrió un error inesperado. Intenta nuevamente.');
+    } finally {
+      setIsRoomActionLoading(false);
+    }
   };
 
   const handleLeaveRoom = (forgetStored = false) => {
@@ -1006,41 +1070,60 @@ export function ReminderApp() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {rooms.map((room) => (
-                  <button
+                  <div
                     key={room.id}
-                    onClick={() => handleRoomCardClick(room)}
-                    className="text-left p-5 rounded-2xl border-2 border-transparent bg-white/80 dark:bg-gray-800/80 hover:border-blue-500 dark:hover:border-blue-400 hover:-translate-y-1 transition-all shadow-lg"
+                    className="relative p-5 rounded-2xl border-2 border-transparent bg-white/80 dark:bg-gray-800/80 hover:border-blue-500 dark:hover:border-blue-400 hover:-translate-y-1 transition-all shadow-lg"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white break-words">{room.name}</h3>
-                      <span
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${room.is_locked
-                          ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
-                          : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-300'
-                          }`}
-                      >
-                        {room.is_locked ? <Lock size={14} /> : <Unlock size={14} />}
-                        {room.is_locked ? 'Privada' : 'Pública'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                      Creada el{' '}
-                      {new Date(room.created_at).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </p>
-                    {room.code === lastRoomCode && (
-                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-300 uppercase tracking-widest">
-                        Mi última sala
+                    <button
+                      onClick={() => handleRoomCardClick(room)}
+                      className="text-left w-full"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white break-words">{room.name}</h3>
+                        <span
+                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${room.is_locked
+                            ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
+                            : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-300'
+                            }`}
+                        >
+                          {room.is_locked ? <Lock size={14} /> : <Unlock size={14} />}
+                          {room.is_locked ? 'Privada' : 'Pública'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Creada el{' '}
+                        {new Date(room.created_at).toLocaleDateString('es-ES', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
                       </p>
+                      {room.code === lastRoomCode && (
+                        <p className="text-xs font-semibold text-blue-600 dark:text-blue-300 uppercase tracking-widest">
+                          Mi última sala
+                        </p>
+                      )}
+                      <div className="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
+                        <span className="font-semibold">Entrar a la sala</span>
+                        <Plus size={16} />
+                      </div>
+                    </button>
+                    {/* Botón para cambiar privacidad */}
+                    {user && room.user_id === user.id && (
+                      <button
+                        onClick={(e) => handleToggleRoomPrivacy(room, e)}
+                        disabled={isRoomActionLoading}
+                        className="absolute top-3 right-3 p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={room.is_locked ? 'Hacer pública' : 'Hacer privada'}
+                      >
+                        {room.is_locked ? (
+                          <Unlock size={16} className="text-green-600 dark:text-green-400" />
+                        ) : (
+                          <Lock size={16} className="text-red-600 dark:text-red-400" />
+                        )}
+                      </button>
                     )}
-                    <div className="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
-                      <span className="font-semibold">Entrar a la sala</span>
-                      <Plus size={16} />
-                    </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -1195,6 +1278,27 @@ export function ReminderApp() {
                     </p>
                   </div>
                 </div>
+                {/* Botón para cambiar privacidad de la sala actual */}
+                {user && roomInfo && roomInfo.user_id === user.id && (
+                  <button
+                    onClick={() => handleToggleRoomPrivacy(roomInfo)}
+                    disabled={isRoomActionLoading}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={roomInfo.is_locked ? 'Hacer pública' : 'Hacer privada'}
+                  >
+                    {roomInfo.is_locked ? (
+                      <>
+                        <Unlock size={18} />
+                        <span className="hidden sm:inline">Hacer pública</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={18} />
+                        <span className="hidden sm:inline">Hacer privada</span>
+                      </>
+                    )}
+                  </button>
+                )}
                 <button
                   onClick={() => handleLeaveRoom(false)}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
