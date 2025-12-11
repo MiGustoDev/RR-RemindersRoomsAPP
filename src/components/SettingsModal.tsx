@@ -1,14 +1,18 @@
-import { X, Moon, Sun, Bell, Trash2, Download, Upload, Users } from 'lucide-react';
+import { X, Moon, Sun, Bell, Trash2, Download, Upload, Users, Lock, Unlock } from 'lucide-react';
+import type { Room } from '../lib/supabase';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   isDark: boolean;
   onToggleDark: () => void;
-  onClearAll: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
   onOpenPeopleManager?: () => void;
+  roomInfo?: Room | null;
+  currentUserId?: string | null;
+  onToggleRoomPrivacy?: () => void;
+  onDeleteRoom?: () => void;
 }
 
 export function SettingsModal({
@@ -16,10 +20,13 @@ export function SettingsModal({
   onClose,
   isDark,
   onToggleDark,
-  onClearAll,
   onExport,
   onImport,
-  onOpenPeopleManager
+  onOpenPeopleManager,
+  roomInfo,
+  currentUserId,
+  onToggleRoomPrivacy,
+  onDeleteRoom
 }: SettingsModalProps) {
   if (!isOpen) return null;
 
@@ -66,6 +73,50 @@ export function SettingsModal({
               </div>
             </button>
           </div>
+
+          {roomInfo && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Configuración de la Sala</h3>
+              <div className="space-y-2">
+                {onToggleRoomPrivacy && (
+                  <button
+                    onClick={() => {
+                      if (currentUserId && roomInfo.user_id === currentUserId) {
+                        onToggleRoomPrivacy();
+                        onClose();
+                      }
+                    }}
+                    disabled={!currentUserId || roomInfo.user_id !== currentUserId}
+                    className="w-full flex items-center gap-3 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20
+                      hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all text-indigo-600 dark:text-indigo-400
+                      disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-50 dark:disabled:hover:bg-indigo-900/20"
+                  >
+                    {roomInfo.is_locked ? <Unlock size={20} /> : <Lock size={20} />}
+                    <span className="font-medium">
+                      {roomInfo.is_locked ? 'Hacer sala pública' : 'Hacer sala privada'}
+                    </span>
+                  </button>
+                )}
+                {onDeleteRoom && (
+                  <button
+                    onClick={() => {
+                      if (currentUserId && roomInfo.user_id === currentUserId) {
+                        onDeleteRoom();
+                        onClose();
+                      }
+                    }}
+                    disabled={!currentUserId || roomInfo.user_id !== currentUserId}
+                    className="w-full flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20
+                      hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-red-600 dark:text-red-400
+                      disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-50 dark:disabled:hover:bg-red-900/20"
+                  >
+                    <Trash2 size={20} />
+                    <span className="font-medium">Eliminar sala</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Notificaciones</h3>
@@ -116,18 +167,6 @@ export function SettingsModal({
               >
                 <Upload size={20} />
                 <span className="font-medium">Importar recordatorios</span>
-              </button>
-              <button
-                onClick={() => {
-                  if (window.confirm('¿Estás seguro de eliminar TODOS los recordatorios? Esta acción no se puede deshacer.')) {
-                    onClearAll();
-                  }
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20
-                  hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-red-600 dark:text-red-400"
-              >
-                <Trash2 size={20} />
-                <span className="font-medium">Eliminar todos los recordatorios</span>
               </button>
             </div>
           </div>
