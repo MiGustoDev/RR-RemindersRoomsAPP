@@ -113,3 +113,6 @@ FROM information_schema.columns
 WHERE table_name IN ('reminder_tags', 'reminder_tag_assignments')
 ORDER BY table_name, ordinal_position;
 
+
+
+

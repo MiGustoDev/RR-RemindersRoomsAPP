@@ -118,7 +118,12 @@ export function PersonSelector({
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <User size={16} className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
           {selectedPerson ? (
-            <span className="truncate font-medium">{selectedPerson.name}</span>
+            <span
+              className="font-medium text-sm leading-snug line-clamp-2 text-left"
+              title={selectedPerson.name}
+            >
+              {selectedPerson.name}
+            </span>
           ) : (
             <span className="text-gray-500 dark:text-gray-400 italic truncate">{placeholder}</span>
           )}
@@ -141,7 +146,7 @@ export function PersonSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700 max-h-64 overflow-hidden flex flex-col">
+        <div className="absolute z-50 w-[320px] max-w-[80vw] mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700 max-h-64 overflow-hidden flex flex-col">
           {/* Barra de búsqueda */}
           <div className="p-2 border-b border-gray-200 dark:border-gray-700">
             <div className="relative">
@@ -200,11 +205,17 @@ export function PersonSelector({
                     <div className="flex items-center gap-2">
                       <User size={16} className="text-blue-500 dark:text-blue-400" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                        <div
+                          className="font-medium text-gray-900 dark:text-gray-100 text-sm leading-snug break-words"
+                          title={person.name}
+                        >
                           {person.name}
                         </div>
                         {person.email && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          <div
+                            className="text-xs text-gray-500 dark:text-gray-400 break-words"
+                            title={person.email}
+                          >
                             {person.email}
                           </div>
                         )}

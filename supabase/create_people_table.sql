@@ -74,3 +74,6 @@ FROM information_schema.columns
 WHERE table_name = 'people'
 ORDER BY ordinal_position;
 
+
+
+

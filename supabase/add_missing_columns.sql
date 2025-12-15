@@ -55,3 +55,6 @@ WHERE table_name = 'reminders'
   AND column_name IN ('priority', 'assigned_to')
 ORDER BY column_name;
 
+
+
+
