@@ -16,6 +16,7 @@ export function TagSelector({ roomCode, selectedTags, onChange, className = '' }
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState('#3B82F6');
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingTagId, setDeletingTagId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,6 +99,39 @@ export function TagSelector({ roomCode, selectedTags, onChange, className = '' }
     '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
   ];
 
+  const handleDeleteTag = async (tagId: string) => {
+    const tagToDelete = tags.find((t) => t.id === tagId);
+    if (!tagToDelete) return;
+
+    const confirmed = window.confirm(
+      `¿Seguro que quieres eliminar la etiqueta "${tagToDelete.name}"? Esta acción no se puede deshacer.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingTagId(tagId);
+    try {
+      const { error } = await supabase
+        .from('reminder_tags')
+        .delete()
+        .eq('id', tagId);
+
+      if (error) throw error;
+
+      // Quitarla de la lista local
+      setTags((prev) => prev.filter((t) => t.id !== tagId));
+      // Y de las seleccionadas si estaba marcada
+      if (selectedTags.includes(tagId)) {
+        onChange(selectedTags.filter((id) => id !== tagId));
+      }
+    } catch (err) {
+      console.error('Error al eliminar etiqueta:', err);
+      alert('No se pudo eliminar la etiqueta. Intenta nuevamente.');
+    } finally {
+      setDeletingTagId(null);
+    }
+  };
+
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
@@ -117,7 +151,7 @@ export function TagSelector({ roomCode, selectedTags, onChange, className = '' }
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl 
+        <div className="absolute z-50 w-[320px] max-w-[80vw] mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl 
           border-2 border-gray-200 dark:border-gray-700 max-h-96 overflow-hidden flex flex-col">
           {/* Barra de búsqueda */}
           <div className="p-2 border-b border-gray-200 dark:border-gray-700">
@@ -194,27 +228,45 @@ export function TagSelector({ roomCode, selectedTags, onChange, className = '' }
             ) : (
               <div className="space-y-1">
                 {filteredTags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => handleToggleTag(tag.id)}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm ${
-                      selectedTags.includes(tag.id)
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500 dark:border-blue-400'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent'
-                    }`}
-                  >
-                    <div
-                      className="w-4 h-4 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    <span className="flex-1 text-left font-medium text-gray-900 dark:text-gray-100">
-                      {tag.name}
-                    </span>
-                    {selectedTags.includes(tag.id) && (
-                      <X size={14} className="text-blue-600 dark:text-blue-400" />
-                    )}
-                  </button>
+                  <div key={tag.id} className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleTag(tag.id)}
+                      className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm ${
+                        selectedTags.includes(tag.id)
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500 dark:border-blue-400'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent'
+                      }`}
+                    >
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      <span
+                        className="flex-1 text-left font-medium text-gray-900 dark:text-gray-100 text-sm leading-snug break-words"
+                        title={tag.name}
+                      >
+                        {tag.name}
+                      </span>
+                      {selectedTags.includes(tag.id) && (
+                        <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTag(tag.id);
+                      }}
+                      disabled={deletingTagId === tag.id}
+                      className="p-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-400 transition-colors text-xs disabled:opacity-50"
+                      title="Eliminar etiqueta"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
