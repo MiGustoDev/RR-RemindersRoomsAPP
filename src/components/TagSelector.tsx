@@ -69,13 +69,32 @@ export function TagSelector({ roomCode, selectedTags, onChange, className = '' }
         .select()
         .single();
 
-      if (error) throw error;
-      setTags([...tags, data]);
-      setNewTagName('');
-      setNewTagColor('#3B82F6');
+      if (error) {
+        console.error('Error detallado al crear etiqueta:', error);
+        
+        // Mensajes más específicos según el tipo de error
+        if (error.code === 'PGRST116' || error.code === '42P01') {
+          alert('La tabla reminder_tags no existe. Ejecuta el script SQL en Supabase para crearla.');
+        } else if (error.code === 'PGRST301' || error.code === '42501') {
+          alert('Error de permisos. Verifica las políticas RLS (Row Level Security) en Supabase.');
+        } else if (error.code === '23505') {
+          alert('Ya existe una etiqueta con ese nombre en esta sala.');
+        } else if (error.message?.includes('room_code')) {
+          alert('Error: El código de sala no es válido.');
+        } else {
+          alert(`No se pudo crear la etiqueta: ${error.message || 'Error desconocido'}`);
+        }
+        return;
+      }
+
+      if (data) {
+        setTags([...tags, data]);
+        setNewTagName('');
+        setNewTagColor('#3B82F6');
+      }
     } catch (err: any) {
-      console.error('Error al crear etiqueta:', err);
-      alert('No se pudo crear la etiqueta. Verifica que la tabla reminder_tags exista.');
+      console.error('Error inesperado al crear etiqueta:', err);
+      alert(`Error inesperado: ${err.message || 'No se pudo crear la etiqueta. Intenta nuevamente.'}`);
     } finally {
       setIsCreating(false);
     }

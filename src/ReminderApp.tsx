@@ -209,8 +209,9 @@ export function ReminderApp() {
         return;
       }
 
-      // Obtener salas creadas por el usuario Y salas donde es miembro
-      // Primero, obtener salas creadas por el usuario
+      // Obtener salas creadas por el usuario, salas donde es miembro
+      // y salas a las que fue invitado por correo
+      // 1) Salas creadas por el usuario
       const { data: ownedRooms, error: ownedError } = await supabase
         .from('rooms')
         .select('id, name, code, created_at, is_locked, user_id')
@@ -221,7 +222,7 @@ export function ReminderApp() {
         throw ownedError;
       }
 
-      // Luego, obtener salas donde el usuario es miembro
+      // 2) Salas donde el usuario es miembro (room_members)
       const { data: memberRooms, error: memberError } = await supabase
         .from('room_members')
         .select(`
@@ -235,9 +236,31 @@ export function ReminderApp() {
         console.warn('Tabla room_members no encontrada. Ejecuta la migración 003_add_room_members.sql');
       }
 
+      // 3) Salas donde el correo del usuario fue invitado (room_invitations)
+      let invitedRooms: any[] | null = null;
+      let invitedError: any = null;
+
+      if (currentUser.email) {
+        const { data, error } = await supabase
+          .from('room_invitations')
+          .select(`
+            room_id,
+            rooms!inner(id, name, code, created_at, is_locked, user_id)
+          `)
+          .eq('email', currentUser.email.toLowerCase());
+
+        invitedRooms = data || null;
+        invitedError = error;
+
+        if (invitedError && invitedError.code !== 'PGRST116' && invitedError.code !== '42P01') {
+          console.warn('Error al obtener invitaciones de salas:', invitedError);
+        }
+      }
+
       // Combinar ambas listas, evitando duplicados
       const ownedRoomsList = ownedRooms || [];
       const memberRoomsList = (memberRooms || []).map((member: any) => member.rooms).filter(Boolean);
+      const invitedRoomsList = (invitedRooms || []).map((invited: any) => invited.rooms).filter(Boolean);
       
       // Crear un Set con los IDs de salas ya incluidas para evitar duplicados
       const roomIds = new Set(ownedRoomsList.map((r: any) => r.id));
@@ -245,6 +268,14 @@ export function ReminderApp() {
       
       // Agregar salas donde es miembro que no sean propias
       memberRoomsList.forEach((room: any) => {
+        if (!roomIds.has(room.id)) {
+          allRooms.push(room);
+          roomIds.add(room.id);
+        }
+      });
+
+      // Agregar salas donde fue invitado por correo que aún no estén
+      invitedRoomsList.forEach((room: any) => {
         if (!roomIds.has(room.id)) {
           allRooms.push(room);
           roomIds.add(room.id);
@@ -259,7 +290,7 @@ export function ReminderApp() {
       });
 
       const data = allRooms;
-      const error = ownedError || memberError;
+      const error = ownedError || memberError || invitedError;
 
       if (error) {
         // Error específico para columna faltante
