@@ -1490,21 +1490,30 @@ export function ReminderApp() {
             </div>
           </div>
         )}
-        {/* Header con Logo y Logout - Full Width */}
+        {/* Header con Logo, Email y Logout - Full Width */}
         <div className="flex justify-between items-center px-6 py-6">
           <img
             src="/Logo Mi Gusto 2025.png"
             alt="Logo Mi Gusto"
             className="h-16 w-auto object-contain drop-shadow-md"
           />
-          <button
-            onClick={() => signOut()}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm"
-            title="Cerrar sesión"
-          >
-            <LogOut size={18} />
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-4">
+            {user?.email && (
+              <div className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  {user.email}
+                </p>
+              </div>
+            )}
+            <button
+              onClick={() => signOut()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm"
+              title="Cerrar sesión"
+            >
+              <LogOut size={18} />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
 
         <div className="max-w-5xl mx-auto px-6 space-y-10 pb-12 flex-1 w-full">
