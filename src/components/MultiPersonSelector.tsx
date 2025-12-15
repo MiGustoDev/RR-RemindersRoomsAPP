@@ -1,29 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { User, Search, X, ChevronDown } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, type Person } from '../lib/supabase';
 
-export type Person = {
-  id: string;
-  name: string;
-  email: string | null;
-  created_at: string;
-};
-
-interface PersonSelectorProps {
-  value: string | null;
-  onChange: (personId: string | null) => void;
+interface MultiPersonSelectorProps {
+  values: string[];
+  onChange: (personIds: string[]) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
 }
 
-export function PersonSelector({
-  value,
+export function MultiPersonSelector({
+  values,
   onChange,
-  placeholder = 'Seleccionar responsable...',
+  placeholder = 'Seleccionar responsables...',
   disabled = false,
   className = '',
-}: PersonSelectorProps) {
+}: MultiPersonSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [people, setPeople] = useState<Person[]>([]);
@@ -44,7 +37,6 @@ export function PersonSelector({
           .order('name', { ascending: true });
 
         if (fetchError) {
-          // Si la tabla no existe, usar lista vacía
           if (fetchError.code === 'PGRST116' || fetchError.code === '42P01') {
             setPeople([]);
             setError('La tabla de personas no existe. Créala en Supabase.');
@@ -81,27 +73,42 @@ export function PersonSelector({
     }
   }, [isOpen]);
 
-  // Filtrar personas según el término de búsqueda
   const filteredPeople = people.filter((person) =>
     person.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (person.email && person.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // Obtener la persona seleccionada
-  const selectedPerson = people.find((p) => p.id === value);
+  const selectedPeople = people.filter((p) => values.includes(p.id));
 
-  const handleSelect = (personId: string | null) => {
-    onChange(personId);
-    setIsOpen(false);
-    setSearchTerm('');
+  const handleTogglePerson = (personId: string) => {
+    if (values.includes(personId)) {
+      onChange(values.filter((id) => id !== personId));
+    } else {
+      onChange([...values, personId]);
+    }
   };
 
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onChange(null);
+    onChange([]);
     setIsOpen(false);
     setSearchTerm('');
   };
+
+  const count = values.length;
+  const primaryPerson = selectedPeople[0];
+
+  let label = placeholder;
+  if (count === 1 && primaryPerson) {
+    label = primaryPerson.name;
+  } else if (count > 1) {
+    label = `${count} persona${count > 1 ? 's' : ''}`;
+  }
+
+  const tooltip =
+    count > 0
+      ? selectedPeople.map((p) => p.name).join(', ')
+      : placeholder;
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
@@ -117,27 +124,16 @@ export function PersonSelector({
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <User size={16} className="text-gray-500 dark:text-gray-400 flex-shrink-0" />
-          {selectedPerson ? (
-            <span
-              className="font-medium text-sm leading-snug line-clamp-2 text-left"
-              title={selectedPerson.name}
-            >
-              {selectedPerson.name}
-            </span>
-          ) : (
-            <span className="text-gray-500 dark:text-gray-400 italic truncate">{placeholder}</span>
-          )}
+          <span
+            className={`font-medium text-sm text-left ${
+              count === 0 ? 'text-gray-500 dark:text-gray-400 italic' : ''
+            } ${count > 1 ? 'whitespace-nowrap' : 'truncate'}`}
+            title={tooltip}
+          >
+            {label}
+          </span>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {selectedPerson && !disabled && (
-            <div
-              onClick={handleClear}
-              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer"
-              title="Limpiar selección"
-            >
-              <X size={14} className="text-gray-500 dark:text-gray-400" />
-            </div>
-          )}
           <ChevronDown
             size={16}
             className={`text-gray-500 dark:text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -183,46 +179,54 @@ export function PersonSelector({
               <>
                 <button
                   type="button"
-                  onClick={() => handleSelect(null)}
+                  onClick={() => onChange([])}
                   className={`w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm ${
-                    !selectedPerson ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : ''
+                    count === 0 ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <User size={16} className="text-gray-400 dark:text-gray-500" />
-                    <span className="text-gray-500 dark:text-gray-400 italic">Sin responsable</span>
+                    <span className="text-gray-500 dark:text-gray-400 italic">Sin responsables</span>
                   </div>
                 </button>
-                {filteredPeople.map((person) => (
-                  <button
-                    key={person.id}
-                    type="button"
-                    onClick={() => handleSelect(person.id)}
-                    className={`w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm ${
-                      selectedPerson?.id === person.id ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <User size={16} className="text-blue-500 dark:text-blue-400" />
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className="font-medium text-gray-900 dark:text-gray-100 text-sm leading-snug break-words"
-                          title={person.name}
-                        >
-                          {person.name}
-                        </div>
-                        {person.email && (
+                {filteredPeople.map((person) => {
+                  const isSelected = values.includes(person.id);
+                  return (
+                    <button
+                      key={person.id}
+                      type="button"
+                      onClick={() => handleTogglePerson(person.id)}
+                      className={`w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm ${
+                        isSelected ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <User size={16} className="text-blue-500 dark:text-blue-400" />
+                        <div className="flex-1 min-w-0">
                           <div
-                            className="text-xs text-gray-500 dark:text-gray-400 break-words"
-                            title={person.email}
+                            className="font-medium text-gray-900 dark:text-gray-100 text-sm leading-snug break-words"
+                            title={person.name}
                           >
-                            {person.email}
+                            {person.name}
                           </div>
+                          {person.email && (
+                            <div
+                              className="text-xs text-gray-500 dark:text-gray-400 break-words"
+                              title={person.email}
+                            >
+                              {person.email}
+                            </div>
+                          )}
+                        </div>
+                        {isSelected && (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
+                            ✓
+                          </span>
                         )}
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </>
             )}
           </div>
@@ -231,4 +235,5 @@ export function PersonSelector({
     </div>
   );
 }
+
 

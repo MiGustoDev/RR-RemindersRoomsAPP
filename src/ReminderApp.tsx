@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Plus, Moon, Sun, Settings, Minimize2, Maximize2, BarChart3, Users, Copy, X, Lock, Unlock, DoorOpen, LogOut, Calendar, Grid, Loader2 } from 'lucide-react';
+import { Plus, Moon, Sun, Settings, Minimize2, Maximize2, BarChart3, Users, Copy, X, Lock, Unlock, DoorOpen, LogOut, Calendar, Grid, Loader2, Mail } from 'lucide-react';
 import { supabase, type Reminder, type Room, type Priority } from './lib/supabase';
 import { ReminderCard } from './components/ReminderCard';
 import { ExpiredPanel } from './components/ExpiredPanel';
 import { SettingsModal } from './components/SettingsModal';
 import { SearchBar } from './components/SearchBar';
 import { StatsPanel } from './components/StatsPanel';
-import { PersonSelector } from './components/PersonSelector';
+import { MultiPersonSelector } from './components/MultiPersonSelector';
 import { PeopleManager } from './components/PeopleManager';
 import { TagSelector } from './components/TagSelector';
 import { CalendarView } from './components/CalendarView';
@@ -25,6 +25,7 @@ export function ReminderApp() {
   const [newDueDate, setNewDueDate] = useState('');
   const [newPriority, setNewPriority] = useState<Priority>('medium');
   const [newAssignedTo, setNewAssignedTo] = useState<string | null>(null);
+  const [newAssignedPeopleIds, setNewAssignedPeopleIds] = useState<string[]>([]);
   const [newTags, setNewTags] = useState<string[]>([]);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [roomInfo, setRoomInfo] = useState<Room | null>(null);
@@ -988,11 +989,12 @@ export function ReminderApp() {
 
       if (error) throw error;
 
-      // Cargar etiquetas para cada recordatorio (con manejo de errores robusto)
+      // Cargar etiquetas y responsables múltiples para cada recordatorio (con manejo de errores robusto)
       // Usar Promise.allSettled para que un error en un recordatorio no rompa todos
       const remindersWithTags = await Promise.allSettled(
         (data || []).map(async (reminder: any) => {
           let tags: any[] = [];
+          let assignees: any[] = [];
           try {
             const { data: tagAssignments, error: tagError } = await supabase
               .from('reminder_tag_assignments')
@@ -1016,12 +1018,38 @@ export function ReminderApp() {
             // Silenciar el error
           }
 
+          // Cargar responsables múltiples (reminder_assignees -> people)
+          try {
+            const { data: assigneeRows, error: assigneesError } = await supabase
+              .from('reminder_assignees')
+              .select('person_id')
+              .eq('reminder_id', reminder.id);
+
+            if (!assigneesError && assigneeRows && assigneeRows.length > 0) {
+              const personIds = assigneeRows.map((row: any) => row.person_id).filter(Boolean);
+              if (personIds.length > 0) {
+                const { data: peopleData, error: peopleError } = await supabase
+                  .from('people')
+                  .select('id, name, email, area, created_at')
+                  .in('id', personIds);
+
+                if (!peopleError && peopleData) {
+                  assignees = peopleData;
+                }
+              }
+            }
+          } catch (err) {
+            // Si la tabla no existe o falla, continuar sin responsables múltiples
+            console.warn('Error al cargar responsables múltiples:', err);
+          }
+
           return {
             ...reminder,
             priority: reminder.priority || 'medium',
             assigned_to: reminder.assigned_to || null,
             progress: reminder.progress ?? 0,
             tags: tags,
+            assignees,
           };
         })
       );
@@ -1078,6 +1106,12 @@ export function ReminderApp() {
         console.warn('No se pudo agregar priority:', e);
       }
 
+      // Responsable principal = primer seleccionado en la lista múltiple (si existe)
+      const primaryAssignee = newAssignedPeopleIds[0] || newAssignedTo || null;
+      if (primaryAssignee) {
+        insertData.assigned_to = primaryAssignee;
+      }
+
       // Intentar insertar primero
       let { data, error } = await supabase
         .from('reminders')
@@ -1117,8 +1151,8 @@ export function ReminderApp() {
         }
 
         // Intentar actualizar assigned_to si hay uno
-        if (newAssignedTo && (!data.assigned_to || data.assigned_to !== newAssignedTo)) {
-          updates.assigned_to = newAssignedTo;
+        if (primaryAssignee && (!data.assigned_to || data.assigned_to !== primaryAssignee)) {
+          updates.assigned_to = primaryAssignee;
           needsUpdate = true;
         }
 
@@ -1190,12 +1224,30 @@ export function ReminderApp() {
           }
         }
 
-        setReminders([normalizedData, ...reminders]);
+        // Si hay responsables múltiples seleccionados, guardarlos
+        if (newAssignedPeopleIds.length > 0) {
+          try {
+            await supabase
+              .from('reminder_assignees')
+              .insert(
+                newAssignedPeopleIds.map((personId) => ({
+                  reminder_id: data.id,
+                  person_id: personId,
+                }))
+              );
+          } catch (err) {
+            console.warn('No se pudieron guardar los responsables múltiples del nuevo recordatorio:', err);
+          }
+        }
+
+        // Recargar la lista de recordatorios para que traiga tags y assignees correctamente
+        await fetchReminders(roomCode, false);
         setNewTitle('');
         setNewDescription('');
         setNewDueDate('');
         setNewPriority('medium');
         setNewAssignedTo(null);
+        setNewAssignedPeopleIds([]);
         setNewTags([]);
         setIsAddingNew(false);
       }
@@ -1238,9 +1290,49 @@ export function ReminderApp() {
       }
 
       if (data) {
+        // Preservar assignees y tags del reminder original, luego recargar assignees
+        const currentReminder = reminders.find((r) => r.id === id);
+        const preservedAssignees = currentReminder?.assignees || [];
+        
+        // Recargar assignees actualizados desde la base de datos
+        let updatedAssignees: any[] = [];
+        try {
+          const { data: assigneeRows } = await supabase
+            .from('reminder_assignees')
+            .select('person_id')
+            .eq('reminder_id', id);
+
+          if (assigneeRows && assigneeRows.length > 0) {
+            const personIds = assigneeRows.map((row: any) => row.person_id).filter(Boolean);
+            if (personIds.length > 0) {
+              const { data: peopleData } = await supabase
+                .from('people')
+                .select('id, name, email, created_at')
+                .in('id', personIds);
+
+              if (peopleData) {
+                updatedAssignees = peopleData;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Error al recargar assignees después de actualizar:', err);
+          // Usar los assignees preservados si falla la carga
+          updatedAssignees = preservedAssignees;
+        }
+
         setReminders(
           reminders.map((reminder) =>
-            reminder.id === id ? data : reminder
+            reminder.id === id
+              ? {
+                  ...reminder,
+                  ...data,
+                  priority: data.priority || reminder.priority || 'medium',
+                  assigned_to: data.assigned_to || null,
+                  assignees: updatedAssignees,
+                  tags: reminder.tags || [], // Preservar tags
+                }
+              : reminder
           )
         );
       } else {
@@ -1248,13 +1340,13 @@ export function ReminderApp() {
           reminders.map((reminder) =>
             reminder.id === id
               ? {
-                ...reminder,
-                title: title.trim(),
-                description: description.trim(),
-                due_date: dueDate,
-                priority: priority ?? reminder.priority ?? 'medium',
-                assigned_to: assignedTo ?? reminder.assigned_to,
-              }
+                  ...reminder,
+                  title: title.trim(),
+                  description: description.trim(),
+                  due_date: dueDate,
+                  priority: priority ?? reminder.priority ?? 'medium',
+                  assigned_to: assignedTo ?? reminder.assigned_to,
+                }
               : reminder
           )
         );
@@ -1834,9 +1926,9 @@ export function ReminderApp() {
                 </div>
                 <button
                   onClick={() => handleLeaveRoom(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="flex items-center gap-3 px-6 py-3 rounded-xl border-2 border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-base font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
                 >
-                  <DoorOpen size={18} />
+                  <DoorOpen size={24} />
                   Cambiar sala
                 </button>
                 {roomCode && (
@@ -1892,6 +1984,15 @@ export function ReminderApp() {
             </div>
 
             <div className="flex items-center gap-2">
+              {user?.email && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                  <Mail size={16} className="text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {user.email}
+                  </span>
+                </div>
+              )}
+              
               <button
                 onClick={() => setViewMode(viewMode === 'cards' ? 'calendar' : 'cards')}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
@@ -2062,11 +2163,16 @@ export function ReminderApp() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Asignado a</label>
-                      <PersonSelector
-                        value={newAssignedTo}
-                        onChange={setNewAssignedTo}
-                        placeholder="Seleccionar responsable..."
+                      <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">
+                        Asignado a
+                      </label>
+                      <MultiPersonSelector
+                        values={newAssignedPeopleIds}
+                        onChange={(ids) => {
+                          setNewAssignedPeopleIds(ids);
+                          setNewAssignedTo(ids[0] || null);
+                        }}
+                        placeholder="Seleccionar responsables..."
                       />
                     </div>
                   </div>

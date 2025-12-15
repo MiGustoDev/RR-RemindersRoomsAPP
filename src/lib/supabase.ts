@@ -92,6 +92,8 @@ export type Reminder = {
   priority: Priority;
   assigned_to: string | null;
   tags?: ReminderTag[];
+  // Responsables adicionales (múltiples personas asignadas)
+  assignees?: Person[];
 };
 
 export type ReminderTag = {
@@ -131,5 +133,8 @@ export type Person = {
   id: string;
   name: string;
   email: string | null;
+  area: string[] | null;
   created_at: string;
 };
+
+export type WorkArea = 'RRHH' | 'Calidad' | 'Sistemas' | 'Marketing' | 'Compras' | 'Administracion';

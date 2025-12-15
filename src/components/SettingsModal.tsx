@@ -234,34 +234,44 @@ export function SettingsModal({
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Gestión</h3>
                 <div className="space-y-2">
                   {onOpenPeopleManager && (
-                    <button
-                      onClick={() => {
-                        onOpenPeopleManager();
-                        onClose();
-                      }}
-                      className="w-full flex items-center gap-3 p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20
-                        hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-all text-purple-600 dark:text-purple-400"
-                    >
-                      <Users size={20} />
-                      <span className="font-medium">Gestionar personas</span>
-                    </button>
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => {
+                          onOpenPeopleManager();
+                          onClose();
+                        }}
+                        className="w-full max-w-xs flex items-center justify-center gap-3 p-4 rounded-xl bg-purple-50 dark:bg-purple-900/20
+                          hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-all text-purple-600 dark:text-purple-400"
+                      >
+                        <Users size={20} />
+                        <span className="font-medium">Gestionar personas</span>
+                      </button>
+                    </div>
                   )}
-                  <button
-                    onClick={onExport}
-                    className="w-full flex items-center gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20
-                      hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-blue-600 dark:text-blue-400"
-                  >
-                    <Download size={20} />
-                    <span className="font-medium">Exportar recordatorios</span>
-                  </button>
-                  <button
-                    onClick={handleImportClick}
-                    className="w-full flex items-center gap-3 p-4 rounded-xl bg-green-50 dark:bg-green-900/20
-                      hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-green-600 dark:text-green-400"
-                  >
-                    <Upload size={20} />
-                    <span className="font-medium">Importar recordatorios</span>
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={onExport}
+                        className="flex-1 flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20
+                          hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-blue-600 dark:text-blue-400"
+                        title="Exportar recordatorios a un archivo JSON"
+                      >
+                        <Download size={20} />
+                        <span className="font-medium text-sm">Exportar</span>
+                        <span className="text-xs opacity-75">recordatorios</span>
+                      </button>
+                      <button
+                        onClick={handleImportClick}
+                        className="flex-1 flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-green-50 dark:bg-green-900/20
+                          hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-green-600 dark:text-green-400"
+                        title="Importar recordatorios desde un archivo JSON"
+                      >
+                        <Upload size={20} />
+                        <span className="font-medium text-sm">Importar</span>
+                        <span className="text-xs opacity-75">recordatorios</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
