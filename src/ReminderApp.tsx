@@ -14,6 +14,30 @@ import { useAuth } from './lib/auth';
 import { useDarkMode } from './lib/theme';
 
 const ROOM_STORAGE_KEY = 'reminder:room-code';
+const ROOM_ACCESS_CODES_KEY = 'reminder:room-access-codes';
+
+// Funciones helper para manejar códigos de acceso guardados
+const getStoredAccessCode = (roomId: string): string | null => {
+  try {
+    const stored = localStorage.getItem(ROOM_ACCESS_CODES_KEY);
+    if (!stored) return null;
+    const codes = JSON.parse(stored);
+    return codes[roomId] || null;
+  } catch {
+    return null;
+  }
+};
+
+const saveAccessCode = (roomId: string, accessCode: string) => {
+  try {
+    const stored = localStorage.getItem(ROOM_ACCESS_CODES_KEY);
+    const codes = stored ? JSON.parse(stored) : {};
+    codes[roomId] = accessCode;
+    localStorage.setItem(ROOM_ACCESS_CODES_KEY, JSON.stringify(codes));
+  } catch (error) {
+    console.error('Error guardando código de acceso:', error);
+  }
+};
 
 export function ReminderApp() {
   const { signOut, user } = useAuth();
@@ -29,6 +53,7 @@ export function ReminderApp() {
   const [newTags, setNewTags] = useState<string[]>([]);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [roomInfo, setRoomInfo] = useState<Room | null>(null);
+  const [roomAdminEmail, setRoomAdminEmail] = useState<string | null>(null);
   const [isDark, setIsDark] = useDarkMode();
   const [showExpiredPanel, setShowExpiredPanel] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -351,12 +376,45 @@ export function ReminderApp() {
       if (error) {
         console.error('Error al obtener la sala:', error);
         setRoomInfo(null);
+        setRoomAdminEmail(null);
         return;
       }
       setRoomInfo(data);
+      
+      // Obtener el email del administrador
+      fetchAdminEmail(data?.user_id || null);
     } catch (error) {
       console.error('Error al obtener la sala:', error);
       setRoomInfo(null);
+      setRoomAdminEmail(null);
+    }
+  };
+
+  const fetchAdminEmail = async (userId: string | null) => {
+    if (!userId) {
+      setRoomAdminEmail(null);
+      return;
+    }
+    
+    // Si el creador es el usuario actual, usar su email
+    if (user && userId === user.id) {
+      setRoomAdminEmail(user.email || null);
+      return;
+    }
+    
+    // Intentar obtener el email del usuario usando una función RPC
+    try {
+      const { data: emailData, error: emailError } = await supabase
+        .rpc('get_user_email', { user_id_param: userId });
+      
+      if (!emailError && emailData) {
+        setRoomAdminEmail(emailData);
+      } else {
+        setRoomAdminEmail(null);
+      }
+    } catch (err) {
+      console.error('Error al obtener email del administrador:', err);
+      setRoomAdminEmail(null);
     }
   };
 
@@ -372,6 +430,9 @@ export function ReminderApp() {
     setReminders([]);
     localStorage.setItem(ROOM_STORAGE_KEY, room.code);
     setLastRoomCode(room.code);
+    
+    // Obtener el email del administrador
+    fetchAdminEmail(room.user_id);
   };
 
   const handleCreateRoom = async () => {
@@ -430,8 +491,74 @@ export function ReminderApp() {
     }
   };
 
-  const handleRoomCardClick = (room: Room) => {
+  const handleRoomCardClick = async (room: Room) => {
     if (room.is_locked) {
+      // Verificar si tenemos el código guardado
+      const storedCode = getStoredAccessCode(room.id);
+      
+      if (storedCode) {
+        // Intentar entrar automáticamente con el código guardado
+        setIsRoomActionLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('rooms')
+            .select('id, name, code, created_at, is_locked, access_code, user_id')
+            .eq('id', room.id)
+            .single();
+
+          if (error) throw error;
+
+          if (data.access_code && data.access_code === storedCode) {
+            const sanitizedRoom: Room = {
+              id: data.id,
+              name: data.name,
+              code: data.code,
+              created_at: data.created_at,
+              is_locked: data.is_locked,
+              user_id: data.user_id || null,
+            };
+
+            // Agregar al usuario como miembro de la sala (si no es el creador)
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (currentUser && data.user_id !== currentUser.id) {
+              try {
+                await supabase
+                  .from('room_members')
+                  .insert({
+                    user_id: currentUser.id,
+                    room_id: data.id,
+                  })
+                  .select()
+                  .single();
+              } catch (memberError: any) {
+                if (memberError.code !== '23505' && memberError.code !== 'PGRST116' && memberError.code !== '42P01') {
+                  console.warn('No se pudo agregar como miembro de la sala:', memberError);
+                }
+              }
+            }
+
+            enterRoom(sanitizedRoom);
+            setIsRoomActionLoading(false);
+            return;
+          } else {
+            // El código guardado ya no es válido, eliminarlo
+            try {
+              const stored = localStorage.getItem(ROOM_ACCESS_CODES_KEY);
+              if (stored) {
+                const codes = JSON.parse(stored);
+                delete codes[room.id];
+                localStorage.setItem(ROOM_ACCESS_CODES_KEY, JSON.stringify(codes));
+              }
+            } catch {}
+          }
+        } catch (error) {
+          console.error('Error verificando código guardado:', error);
+        } finally {
+          setIsRoomActionLoading(false);
+        }
+      }
+
+      // Si no hay código guardado o no es válido, mostrar el prompt
       setRoomPendingAccess(room);
       setAccessCodeInput('');
       setShowAccessPrompt(true);
@@ -463,6 +590,9 @@ export function ReminderApp() {
       if (error) throw error;
 
       if (data.access_code && data.access_code === accessCodeInput.trim()) {
+        // Guardar el código de acceso para futuras visitas
+        saveAccessCode(data.id, accessCodeInput.trim());
+
         const sanitizedRoom: Room = {
           id: data.id,
           name: data.name,
@@ -863,8 +993,57 @@ export function ReminderApp() {
         return;
       }
 
-      // Si la sala es privada, pedir el código de acceso
+      // Si la sala es privada, verificar si tenemos el código guardado
       if (data.is_locked) {
+        const storedCode = getStoredAccessCode(data.id);
+        
+        if (storedCode && data.access_code && data.access_code === storedCode) {
+          // Tenemos el código guardado y es válido, entrar directamente
+          const sanitizedRoom: Room = {
+            id: data.id,
+            name: data.name,
+            code: data.code,
+            created_at: data.created_at,
+            is_locked: data.is_locked,
+            user_id: data.user_id || null,
+          };
+
+          // Agregar al usuario como miembro de la sala (si no es el creador)
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser && data.user_id !== currentUser.id) {
+            try {
+              await supabase
+                .from('room_members')
+                .insert({
+                  user_id: currentUser.id,
+                  room_id: data.id,
+                })
+                .select()
+                .single();
+            } catch (memberError: any) {
+              if (memberError.code !== '23505' && memberError.code !== 'PGRST116' && memberError.code !== '42P01') {
+                console.warn('No se pudo agregar como miembro de la sala:', memberError);
+              }
+            }
+          }
+
+          setRoomCodeInput('');
+          setRoomCodeError(null);
+          setIsRoomActionLoading(false);
+          
+          if (window.requestIdleCallback) {
+            requestIdleCallback(() => {
+              enterRoom(sanitizedRoom);
+            }, { timeout: 100 });
+          } else {
+            setTimeout(() => {
+              enterRoom(sanitizedRoom);
+            }, 100);
+          }
+          return;
+        }
+
+        // Si no hay código guardado o no es válido, mostrar el prompt
         setRoomPendingAccess({
           id: data.id,
           name: data.name,
@@ -1979,6 +2158,11 @@ export function ReminderApp() {
                     <Copy size={16} />
                     {roomCode}
                   </button>
+                )}
+                {roomAdminEmail && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                    Admin: {roomAdminEmail}
+                  </span>
                 )}
               </div>
             </div>
