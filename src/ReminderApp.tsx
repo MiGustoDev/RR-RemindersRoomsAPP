@@ -153,10 +153,10 @@ export function ReminderApp() {
         setIsAddingNew(false);
         setNewTitle('');
         setNewDescription('');
-                        setNewDueDate('');
-                        setNewPriority('medium');
-                        setNewAssignedTo(null);
-                        setNewTags([]);
+        setNewDueDate('');
+        setNewPriority('medium');
+        setNewAssignedTo(null);
+        setNewTags([]);
       }
     };
 
@@ -352,7 +352,7 @@ export function ReminderApp() {
     try {
       const { data, error } = await supabase
         .from('rooms')
-        .select('id, name, code, created_at, is_locked, access_code')
+        .select('id, name, code, created_at, is_locked, access_code, user_id')
         .eq('id', roomPendingAccess.id)
         .single();
 
@@ -468,7 +468,7 @@ export function ReminderApp() {
                 .from('reminder_tags')
                 .select('*')
                 .in('id', tagIds);
-              
+
               if (!tagsError && tagsData) {
                 tags = tagsData;
               }
@@ -492,7 +492,7 @@ export function ReminderApp() {
       const successfulReminders = remindersWithTags
         .filter((result): result is PromiseFulfilledResult<any> => result.status === 'fulfilled')
         .map(result => result.value);
-      
+
       // Si hay algunos que fallaron, al menos mostrar los que funcionaron
       if (successfulReminders.length === 0 && (data || []).length > 0) {
         // Si todos fallaron, usar los datos sin tags
@@ -595,7 +595,7 @@ export function ReminderApp() {
             if (updateError) {
               // Si la columna no existe, simplemente continuar sin ella
               if (updateError.message && (
-                updateError.message.includes('priority') || 
+                updateError.message.includes('priority') ||
                 updateError.message.includes('assigned_to')
               )) {
                 console.warn('Algunas columnas no existen en la base de datos:', updateError.message);
@@ -666,7 +666,7 @@ export function ReminderApp() {
       const errorMessage = error?.message || 'Error desconocido';
       const errorDetails = error?.details || '';
       const errorHint = error?.hint || '';
-      
+
       alert(`Error al crear el recordatorio:\n\n${errorMessage}${errorDetails ? `\n\nDetalles: ${errorDetails}` : ''}${errorHint ? `\n\nSugerencia: ${errorHint}` : ''}\n\nVerifica que la base de datos tenga todas las columnas necesarias.`);
     }
   };
