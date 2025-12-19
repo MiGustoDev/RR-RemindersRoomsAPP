@@ -18,7 +18,7 @@ export function ExpiredPanel({
   onOpenDetails
 }: ExpiredPanelProps) {
   return (
-    <div className="w-80 flex-shrink-0 bg-white dark:bg-gray-800 border-l-2 border-gray-200 dark:border-gray-700 h-full overflow-y-auto">
+    <div className="w-80 flex-shrink-0 bg-white dark:bg-gray-800 border-l-2 border-gray-200 dark:border-gray-700 h-full overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
       <div className="sticky top-0 bg-white dark:bg-gray-800 border-b-2 border-gray-200 dark:border-gray-700 p-4 z-10">
         <div className="flex items-center gap-2 mb-2">
           <AlertCircle size={24} className="text-red-600 dark:text-red-400" />

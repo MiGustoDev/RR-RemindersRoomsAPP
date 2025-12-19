@@ -2063,7 +2063,7 @@ export function ReminderApp() {
         </div>
       )}
 
-      <div className="h-screen flex flex-col">
+      <div className="h-[100dvh] flex flex-col">
         <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-b-2 border-gray-200 dark:border-gray-700 px-6 py-4 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-3">
@@ -2228,7 +2228,7 @@ export function ReminderApp() {
         </header>
 
         <div className="flex-1 flex overflow-hidden">
-          <div className={`flex-1 overflow-hidden flex flex-col ${showExpiredPanel ? '' : 'mr-0'}`}>
+          <div className={`flex-1 overflow-hidden flex flex-col min-h-0 ${showExpiredPanel ? '' : 'mr-0'}`}>
             <div className="p-6 space-y-4">
               <div className="flex gap-4">
                 <button
@@ -2272,9 +2272,22 @@ export function ReminderApp() {
               </div>
 
               {showStats && (
-                <div className="animate-slideDown">
-                  <StatsPanel reminders={reminders} />
-                </div>
+                <>
+                  <style>
+                    {`
+                      .no-scrollbar::-webkit-scrollbar {
+                        display: none;
+                      }
+                      .no-scrollbar {
+                        -ms-overflow-style: none;
+                        scrollbar-width: none;
+                      }
+                    `}
+                  </style>
+                  <div className="animate-slideDown overflow-y-auto max-h-[80vh] min-h-0 pb-24 no-scrollbar">
+                    <StatsPanel reminders={reminders} />
+                  </div>
+                </>
               )}
             </div>
 
@@ -2404,14 +2417,14 @@ export function ReminderApp() {
                 </div>
               </div>
             ) : viewMode === 'calendar' ? (
-              <div className="flex-1 overflow-y-auto px-6 pb-6">
+              <div className="flex-1 overflow-y-auto px-6 pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
                 <CalendarView
                   reminders={activeReminders}
                   onReminderClick={setExpandedReminder}
                 />
               </div>
             ) : (
-              <div className="flex-1 overflow-x-auto overflow-y-hidden px-6 pb-6">
+              <div className="flex-1 overflow-x-hidden overflow-y-auto px-6 pb-24 min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
                 <div className="flex flex-wrap gap-4 content-start animate-fadeIn">
                   {activeReminders.map((reminder, index) => (
                     <div key={reminder.id} style={{ animationDelay: `${index * 0.05}s` }} className="animate-scaleIn">
@@ -2430,7 +2443,7 @@ export function ReminderApp() {
           </div>
 
           {showExpiredPanel && (
-            <div className="animate-slideDown">
+            <div className="animate-slideDown h-full">
               <ExpiredPanel
                 expiredReminders={expiredReminders}
                 onUpdate={handleUpdateReminder}
