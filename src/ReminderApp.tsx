@@ -287,11 +287,11 @@ export function ReminderApp() {
       const ownedRoomsList = ownedRooms || [];
       const memberRoomsList = (memberRooms || []).map((member: any) => member.rooms).filter(Boolean);
       const invitedRoomsList = (invitedRooms || []).map((invited: any) => invited.rooms).filter(Boolean);
-      
+
       // Crear un Set con los IDs de salas ya incluidas para evitar duplicados
       const roomIds = new Set(ownedRoomsList.map((r: any) => r.id));
       const allRooms = [...ownedRoomsList];
-      
+
       // Agregar salas donde es miembro que no sean propias
       memberRoomsList.forEach((room: any) => {
         if (!roomIds.has(room.id)) {
@@ -380,7 +380,7 @@ export function ReminderApp() {
         return;
       }
       setRoomInfo(data);
-      
+
       // Obtener el email del administrador
       fetchAdminEmail(data?.user_id || null);
     } catch (error) {
@@ -395,18 +395,18 @@ export function ReminderApp() {
       setRoomAdminEmail(null);
       return;
     }
-    
+
     // Si el creador es el usuario actual, usar su email
     if (user && userId === user.id) {
       setRoomAdminEmail(user.email || null);
       return;
     }
-    
+
     // Intentar obtener el email del usuario usando una función RPC
     try {
       const { data: emailData, error: emailError } = await supabase
         .rpc('get_user_email', { user_id_param: userId });
-      
+
       if (!emailError && emailData) {
         setRoomAdminEmail(emailData);
       } else {
@@ -423,14 +423,14 @@ export function ReminderApp() {
     setRoomCodeInput('');
     setRoomCodeError(null);
     setIsRoomActionLoading(false);
-    
+
     // Luego cambiar la vista (esto causa el re-render)
     setRoomCode(room.code);
     setRoomInfo(room);
     setReminders([]);
     localStorage.setItem(ROOM_STORAGE_KEY, room.code);
     setLastRoomCode(room.code);
-    
+
     // Obtener el email del administrador
     fetchAdminEmail(room.user_id);
   };
@@ -495,7 +495,7 @@ export function ReminderApp() {
     if (room.is_locked) {
       // Verificar si tenemos el código guardado
       const storedCode = getStoredAccessCode(room.id);
-      
+
       if (storedCode) {
         // Intentar entrar automáticamente con el código guardado
         setIsRoomActionLoading(true);
@@ -549,7 +549,7 @@ export function ReminderApp() {
                 delete codes[room.id];
                 localStorage.setItem(ROOM_ACCESS_CODES_KEY, JSON.stringify(codes));
               }
-            } catch {}
+            } catch { }
           }
         } catch (error) {
           console.error('Error verificando código guardado:', error);
@@ -996,7 +996,7 @@ export function ReminderApp() {
       // Si la sala es privada, verificar si tenemos el código guardado
       if (data.is_locked) {
         const storedCode = getStoredAccessCode(data.id);
-        
+
         if (storedCode && data.access_code && data.access_code === storedCode) {
           // Tenemos el código guardado y es válido, entrar directamente
           const sanitizedRoom: Room = {
@@ -1030,16 +1030,10 @@ export function ReminderApp() {
           setRoomCodeInput('');
           setRoomCodeError(null);
           setIsRoomActionLoading(false);
-          
-          if (window.requestIdleCallback) {
-            requestIdleCallback(() => {
-              enterRoom(sanitizedRoom);
-            }, { timeout: 100 });
-          } else {
-            setTimeout(() => {
-              enterRoom(sanitizedRoom);
-            }, 100);
-          }
+
+          setTimeout(() => {
+            enterRoom(sanitizedRoom);
+          }, 100);
           return;
         }
 
@@ -1090,26 +1084,20 @@ export function ReminderApp() {
           }
         }
       }
-      
+
       // Limpiar el input y errores primero
       const roomToEnter = sanitizedRoom;
       setRoomCodeInput('');
       setRoomCodeError(null);
-      
+
       // Limpiar el loading ANTES de cambiar de vista
       setIsRoomActionLoading(false);
-      
+
       // Usar requestIdleCallback o setTimeout para asegurar que React termine de renderizar
       // antes de cambiar de vista, evitando el error de insertBefore
-      if (window.requestIdleCallback) {
-        requestIdleCallback(() => {
-          enterRoom(roomToEnter);
-        }, { timeout: 100 });
-      } else {
-        setTimeout(() => {
-          enterRoom(roomToEnter);
-        }, 100);
-      }
+      setTimeout(() => {
+        enterRoom(roomToEnter);
+      }, 100);
     } catch (error) {
       console.error('Error al entrar a la sala:', error);
       setRoomCodeError('No se pudo acceder a la sala. Verifica el código e intenta nuevamente.');
@@ -1472,7 +1460,7 @@ export function ReminderApp() {
         // Preservar assignees y tags del reminder original, luego recargar assignees
         const currentReminder = reminders.find((r) => r.id === id);
         const preservedAssignees = currentReminder?.assignees || [];
-        
+
         // Recargar assignees actualizados desde la base de datos
         let updatedAssignees: any[] = [];
         try {
@@ -1504,13 +1492,13 @@ export function ReminderApp() {
           reminders.map((reminder) =>
             reminder.id === id
               ? {
-                  ...reminder,
-                  ...data,
-                  priority: data.priority || reminder.priority || 'medium',
-                  assigned_to: data.assigned_to || null,
-                  assignees: updatedAssignees,
-                  tags: reminder.tags || [], // Preservar tags
-                }
+                ...reminder,
+                ...data,
+                priority: data.priority || reminder.priority || 'medium',
+                assigned_to: data.assigned_to || null,
+                assignees: updatedAssignees,
+                tags: reminder.tags || [], // Preservar tags
+              }
               : reminder
           )
         );
@@ -1519,13 +1507,13 @@ export function ReminderApp() {
           reminders.map((reminder) =>
             reminder.id === id
               ? {
-                  ...reminder,
-                  title: title.trim(),
-                  description: description.trim(),
-                  due_date: dueDate,
-                  priority: priority ?? reminder.priority ?? 'medium',
-                  assigned_to: assignedTo ?? reminder.assigned_to,
-                }
+                ...reminder,
+                title: title.trim(),
+                description: description.trim(),
+                due_date: dueDate,
+                priority: priority ?? reminder.priority ?? 'medium',
+                assigned_to: assignedTo ?? reminder.assigned_to,
+              }
               : reminder
           )
         );
@@ -2176,7 +2164,7 @@ export function ReminderApp() {
                   </span>
                 </div>
               )}
-              
+
               <button
                 onClick={() => setViewMode(viewMode === 'cards' ? 'calendar' : 'cards')}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
@@ -2461,7 +2449,7 @@ export function ReminderApp() {
 
       {/* Modal para hacer pública (pedir código) - Fuera del contenedor principal */}
       {showMakePublicPrompt && roomPendingMakePublic && (
-        <div 
+        <div
           className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
           onClick={(e) => {
@@ -2471,7 +2459,7 @@ export function ReminderApp() {
             }
           }}
         >
-          <div 
+          <div
             className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md border border-orange-200 dark:border-orange-900 p-6 space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
@@ -2548,7 +2536,7 @@ export function ReminderApp() {
 
       {/* Modal para cambiar privacidad de pública a privada - Fuera del contenedor principal */}
       {showPrivacyChangePrompt && roomPendingPrivacyChange && (
-        <div 
+        <div
           className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
           onClick={(e) => {
@@ -2558,7 +2546,7 @@ export function ReminderApp() {
             }
           }}
         >
-          <div 
+          <div
             className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md border border-purple-200 dark:border-purple-900 p-6 space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
@@ -2651,7 +2639,7 @@ export function ReminderApp() {
 
       {/* Modal para eliminar sala */}
       {showDeleteRoomPrompt && roomPendingDelete && (
-        <div 
+        <div
           className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
           onClick={(e) => {
@@ -2660,7 +2648,7 @@ export function ReminderApp() {
             }
           }}
         >
-          <div 
+          <div
             className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md border border-red-200 dark:border-red-900 p-6 space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
