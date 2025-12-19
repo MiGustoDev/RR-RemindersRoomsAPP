@@ -11,10 +11,25 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
   const [people, setPeople] = useState<Person[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [areaFilter, setAreaFilter] = useState<string>('');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', email: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', areas: [] as string[] });
   const [error, setError] = useState<string | null>(null);
+
+  const workAreas: Array<{ value: string; label: string }> = [
+    { value: '', label: 'Todas las áreas' },
+    { value: 'RRHH', label: 'RRHH' },
+    { value: 'Calidad', label: 'Calidad' },
+    { value: 'Sistemas', label: 'Sistemas' },
+    { value: 'Marketing', label: 'Marketing' },
+    { value: 'Compras', label: 'Compras' },
+    { value: 'Administracion', label: 'Administración' },
+    { value: 'Mantenimiento', label: 'Mantenimiento' },
+    { value: 'Logistica', label: 'Logística' },
+    { value: 'Fabrica', label: 'Fábrica' },
+    { value: 'JEFE', label: 'JEFE' },
+  ];
 
   useEffect(() => {
     if (isOpen) {
@@ -28,7 +43,7 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
     try {
       const { data, error: fetchError } = await supabase
         .from('people')
-        .select('id, name, email, created_at')
+        .select('id, name, email, area, created_at')
         .order('name', { ascending: true });
 
       if (fetchError) throw fetchError;
@@ -44,22 +59,33 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
   const handleAdd = () => {
     setIsAdding(true);
     setEditingId(null);
-    setFormData({ name: '', email: '' });
+    setFormData({ name: '', email: '', areas: [] });
     setError(null);
   };
 
   const handleEdit = (person: Person) => {
     setEditingId(person.id);
     setIsAdding(false);
-    setFormData({ name: person.name, email: person.email || '' });
+    setFormData({ name: person.name, email: person.email || '', areas: person.area || [] });
     setError(null);
   };
 
   const handleCancel = () => {
     setIsAdding(false);
     setEditingId(null);
-    setFormData({ name: '', email: '' });
+    setFormData({ name: '', email: '', areas: [] });
     setError(null);
+  };
+
+  const handleToggleArea = (areaValue: string) => {
+    setFormData(prev => {
+      const currentAreas = prev.areas;
+      if (currentAreas.includes(areaValue)) {
+        return { ...prev, areas: currentAreas.filter(a => a !== areaValue) };
+      } else {
+        return { ...prev, areas: [...currentAreas, areaValue] };
+      }
+    });
   };
 
   const handleSave = async () => {
@@ -70,12 +96,15 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
 
     setError(null);
     try {
+      const areaValue = formData.areas.length > 0 ? formData.areas : null;
+      
       if (isAdding) {
         const { error: insertError } = await supabase
           .from('people')
           .insert([{
             name: formData.name.trim(),
             email: formData.email.trim() || null,
+            area: areaValue,
           }]);
 
         if (insertError) throw insertError;
@@ -85,6 +114,7 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
           .update({
             name: formData.name.trim(),
             email: formData.email.trim() || null,
+            area: areaValue,
           })
           .eq('id', editingId);
 
@@ -118,10 +148,19 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
     }
   };
 
-  const filteredPeople = people.filter((person) =>
-    person.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (person.email && person.email.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredPeople = people.filter((person) => {
+    // Filtro por búsqueda de texto
+    const matchesSearch = searchTerm === '' ||
+      person.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (person.email && person.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (person.area && person.area.some(a => a.toLowerCase().includes(searchTerm.toLowerCase())));
+    
+    // Filtro por área
+    const matchesArea = areaFilter === '' || 
+      (person.area && person.area.includes(areaFilter));
+    
+    return matchesSearch && matchesArea;
+  });
 
   if (!isOpen) return null;
 
@@ -145,7 +184,7 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
         {/* Content */}
         <div className="flex-1 overflow-hidden flex flex-col p-6">
           {/* Barra de búsqueda y botón agregar */}
-          <div className="flex gap-3 mb-4">
+          <div className="flex gap-3 mb-3">
             <div className="relative flex-1">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
               <input
@@ -167,6 +206,29 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
               <Plus size={18} />
               Agregar
             </button>
+          </div>
+
+          {/* Filtro por área */}
+          <div className="mb-4">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 block">
+              Filtrar por área
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {workAreas.map((area) => (
+                <button
+                  key={area.value}
+                  onClick={() => setAreaFilter(area.value)}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200
+                    ${
+                      areaFilter === area.value
+                        ? 'bg-blue-500 text-white shadow-md shadow-blue-500/30 scale-105'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
+                    }`}
+                >
+                  {area.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Formulario de agregar/editar */}
@@ -204,6 +266,36 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
                       bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 
                       focus:outline-none focus:border-blue-600 dark:focus:border-blue-300"
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2 block">
+                    Áreas de trabajo
+                  </label>
+                  <div className="flex flex-wrap gap-2 p-3 rounded-lg border-2 border-blue-500 dark:border-blue-400 bg-white dark:bg-gray-700">
+                    {workAreas.filter(area => area.value !== '').map((area) => (
+                      <button
+                        key={area.value}
+                        type="button"
+                        onClick={() => handleToggleArea(area.value)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
+                          ${
+                            formData.areas.includes(area.value)
+                              ? 'bg-blue-500 text-white shadow-md shadow-blue-500/30'
+                              : 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500 border border-gray-200 dark:border-gray-500'
+                          }`}
+                      >
+                        {formData.areas.includes(area.value) && (
+                          <span className="text-xs">✓</span>
+                        )}
+                        {area.label}
+                      </button>
+                    ))}
+                  </div>
+                  {formData.areas.length > 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      {formData.areas.length} área{formData.areas.length !== 1 ? 's' : ''} seleccionada{formData.areas.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
                 </div>
                 {error && (
                   <div className="p-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
@@ -258,12 +350,26 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
                         <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
                           {person.name}
                         </div>
-                        {person.email && (
-                          <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 truncate">
-                            <Mail size={12} />
-                            {person.email}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                          {person.email && (
+                            <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 truncate">
+                              <Mail size={12} />
+                              {person.email}
+                            </div>
+                          )}
+                          {person.area && person.area.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {person.area.map((area, idx) => (
+                                <span 
+                                  key={idx}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                                >
+                                  {area}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -296,4 +402,7 @@ export function PeopleManager({ isOpen, onClose }: PeopleManagerProps) {
     </div>
   );
 }
+
+
+
 

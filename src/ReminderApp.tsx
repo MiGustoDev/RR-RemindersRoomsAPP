@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Plus, Moon, Sun, Settings, Minimize2, Maximize2, BarChart3, Users, Copy, X, Lock, Unlock, DoorOpen, LogOut, Calendar, Grid } from 'lucide-react';
+import { Plus, Moon, Sun, Settings, Minimize2, Maximize2, BarChart3, Users, Copy, X, Lock, Unlock, DoorOpen, LogOut, Calendar, Grid, Loader2, Mail } from 'lucide-react';
 import { supabase, type Reminder, type Room, type Priority } from './lib/supabase';
 import { ReminderCard } from './components/ReminderCard';
 import { ExpiredPanel } from './components/ExpiredPanel';
 import { SettingsModal } from './components/SettingsModal';
 import { SearchBar } from './components/SearchBar';
 import { StatsPanel } from './components/StatsPanel';
-import { PersonSelector } from './components/PersonSelector';
+import { MultiPersonSelector } from './components/MultiPersonSelector';
 import { PeopleManager } from './components/PeopleManager';
 import { TagSelector } from './components/TagSelector';
 import { CalendarView } from './components/CalendarView';
@@ -14,6 +14,30 @@ import { useAuth } from './lib/auth';
 import { useDarkMode } from './lib/theme';
 
 const ROOM_STORAGE_KEY = 'reminder:room-code';
+const ROOM_ACCESS_CODES_KEY = 'reminder:room-access-codes';
+
+// Funciones helper para manejar códigos de acceso guardados
+const getStoredAccessCode = (roomId: string): string | null => {
+  try {
+    const stored = localStorage.getItem(ROOM_ACCESS_CODES_KEY);
+    if (!stored) return null;
+    const codes = JSON.parse(stored);
+    return codes[roomId] || null;
+  } catch {
+    return null;
+  }
+};
+
+const saveAccessCode = (roomId: string, accessCode: string) => {
+  try {
+    const stored = localStorage.getItem(ROOM_ACCESS_CODES_KEY);
+    const codes = stored ? JSON.parse(stored) : {};
+    codes[roomId] = accessCode;
+    localStorage.setItem(ROOM_ACCESS_CODES_KEY, JSON.stringify(codes));
+  } catch (error) {
+    console.error('Error guardando código de acceso:', error);
+  }
+};
 
 export function ReminderApp() {
   const { signOut, user } = useAuth();
@@ -25,9 +49,11 @@ export function ReminderApp() {
   const [newDueDate, setNewDueDate] = useState('');
   const [newPriority, setNewPriority] = useState<Priority>('medium');
   const [newAssignedTo, setNewAssignedTo] = useState<string | null>(null);
+  const [newAssignedPeopleIds, setNewAssignedPeopleIds] = useState<string[]>([]);
   const [newTags, setNewTags] = useState<string[]>([]);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [roomInfo, setRoomInfo] = useState<Room | null>(null);
+  const [roomAdminEmail, setRoomAdminEmail] = useState<string | null>(null);
   const [isDark, setIsDark] = useDarkMode();
   const [showExpiredPanel, setShowExpiredPanel] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -48,6 +74,7 @@ export function ReminderApp() {
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomAccessCode, setNewRoomAccessCode] = useState('');
   const [roomActionMessage, setRoomActionMessage] = useState<string | null>(null);
+  const [copyConfirmMessage, setCopyConfirmMessage] = useState<string | null>(null);
   const [isRoomActionLoading, setIsRoomActionLoading] = useState(false);
   const [roomPendingAccess, setRoomPendingAccess] = useState<Room | null>(null);
   const [accessCodeInput, setAccessCodeInput] = useState('');
@@ -55,6 +82,20 @@ export function ReminderApp() {
   const [accessError, setAccessError] = useState<string | null>(null);
   const [lastRoomCode, setLastRoomCode] = useState<string | null>(null);
   const [expandedReminder, setExpandedReminder] = useState<Reminder | null>(null);
+  const [showPrivacyChangePrompt, setShowPrivacyChangePrompt] = useState(false);
+  const [roomPendingPrivacyChange, setRoomPendingPrivacyChange] = useState<Room | null>(null);
+  const [privacyAccessCodeInput, setPrivacyAccessCodeInput] = useState('');
+  const [privacyAccessError, setPrivacyAccessError] = useState<string | null>(null);
+  const [showMakePublicPrompt, setShowMakePublicPrompt] = useState(false);
+  const [roomPendingMakePublic, setRoomPendingMakePublic] = useState<Room | null>(null);
+  const [makePublicCodeInput, setMakePublicCodeInput] = useState('');
+  const [makePublicError, setMakePublicError] = useState<string | null>(null);
+  const [showDeleteRoomPrompt, setShowDeleteRoomPrompt] = useState(false);
+  const [roomPendingDelete, setRoomPendingDelete] = useState<Room | null>(null);
+  const [deleteRoomCodeInput, setDeleteRoomCodeInput] = useState('');
+  const [deleteRoomError, setDeleteRoomError] = useState<string | null>(null);
+  const [roomCodeInput, setRoomCodeInput] = useState('');
+  const [roomCodeError, setRoomCodeError] = useState<string | null>(null);
 
   useEffect(() => {
     const storedCode = localStorage.getItem(ROOM_STORAGE_KEY);
@@ -77,6 +118,15 @@ export function ReminderApp() {
       supabase.removeChannel(channel);
     };
   }, [user]);
+
+  // Debug: Ver cuando cambia el estado del modal
+  useEffect(() => {
+    console.log('🔍 Estado del modal de privacidad:', {
+      showPrivacyChangePrompt,
+      roomPendingPrivacyChange: roomPendingPrivacyChange?.name,
+      roomCode
+    });
+  }, [showPrivacyChangePrompt, roomPendingPrivacyChange, roomCode]);
 
   const fetchAvailableTags = async (targetRoomCode: string) => {
     try {
@@ -185,12 +235,88 @@ export function ReminderApp() {
         return;
       }
 
-      // Filtrar salas por user_id del usuario actual
-      const { data, error } = await supabase
+      // Obtener salas creadas por el usuario, salas donde es miembro
+      // y salas a las que fue invitado por correo
+      // 1) Salas creadas por el usuario
+      const { data: ownedRooms, error: ownedError } = await supabase
         .from('rooms')
         .select('id, name, code, created_at, is_locked, user_id')
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false });
+
+      if (ownedError && ownedError.code !== 'PGRST116' && ownedError.code !== '42P01') {
+        throw ownedError;
+      }
+
+      // 2) Salas donde el usuario es miembro (room_members)
+      const { data: memberRooms, error: memberError } = await supabase
+        .from('room_members')
+        .select(`
+          room_id,
+          rooms!inner(id, name, code, created_at, is_locked, user_id)
+        `)
+        .eq('user_id', currentUser.id);
+
+      if (memberError && memberError.code !== 'PGRST116' && memberError.code !== '42P01') {
+        // Si la tabla room_members no existe, solo usar las salas propias
+        console.warn('Tabla room_members no encontrada. Ejecuta la migración 003_add_room_members.sql');
+      }
+
+      // 3) Salas donde el correo del usuario fue invitado (room_invitations)
+      let invitedRooms: any[] | null = null;
+      let invitedError: any = null;
+
+      if (currentUser.email) {
+        const { data, error } = await supabase
+          .from('room_invitations')
+          .select(`
+            room_id,
+            rooms!inner(id, name, code, created_at, is_locked, user_id)
+          `)
+          .eq('email', currentUser.email.toLowerCase());
+
+        invitedRooms = data || null;
+        invitedError = error;
+
+        if (invitedError && invitedError.code !== 'PGRST116' && invitedError.code !== '42P01') {
+          console.warn('Error al obtener invitaciones de salas:', invitedError);
+        }
+      }
+
+      // Combinar ambas listas, evitando duplicados
+      const ownedRoomsList = ownedRooms || [];
+      const memberRoomsList = (memberRooms || []).map((member: any) => member.rooms).filter(Boolean);
+      const invitedRoomsList = (invitedRooms || []).map((invited: any) => invited.rooms).filter(Boolean);
+      
+      // Crear un Set con los IDs de salas ya incluidas para evitar duplicados
+      const roomIds = new Set(ownedRoomsList.map((r: any) => r.id));
+      const allRooms = [...ownedRoomsList];
+      
+      // Agregar salas donde es miembro que no sean propias
+      memberRoomsList.forEach((room: any) => {
+        if (!roomIds.has(room.id)) {
+          allRooms.push(room);
+          roomIds.add(room.id);
+        }
+      });
+
+      // Agregar salas donde fue invitado por correo que aún no estén
+      invitedRoomsList.forEach((room: any) => {
+        if (!roomIds.has(room.id)) {
+          allRooms.push(room);
+          roomIds.add(room.id);
+        }
+      });
+
+      // Ordenar por fecha de creación (más recientes primero)
+      allRooms.sort((a: any, b: any) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return dateB - dateA;
+      });
+
+      const data = allRooms;
+      const error = ownedError || memberError || invitedError;
 
       if (error) {
         // Error específico para columna faltante
@@ -240,34 +366,73 @@ export function ReminderApp() {
 
   const fetchRoomInfo = async (code: string) => {
     try {
-      // Obtener el usuario actual
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) {
-        setRoomInfo(null);
-        return;
-      }
-
+      // Buscar la sala por código sin filtrar por user_id (puede ser de cualquier usuario)
       const { data, error } = await supabase
         .from('rooms')
         .select('id, name, code, created_at, is_locked, user_id')
         .eq('code', code)
-        .eq('user_id', currentUser.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error al obtener la sala:', error);
+        setRoomInfo(null);
+        setRoomAdminEmail(null);
+        return;
+      }
       setRoomInfo(data);
+      
+      // Obtener el email del administrador
+      fetchAdminEmail(data?.user_id || null);
     } catch (error) {
       console.error('Error al obtener la sala:', error);
       setRoomInfo(null);
+      setRoomAdminEmail(null);
+    }
+  };
+
+  const fetchAdminEmail = async (userId: string | null) => {
+    if (!userId) {
+      setRoomAdminEmail(null);
+      return;
+    }
+    
+    // Si el creador es el usuario actual, usar su email
+    if (user && userId === user.id) {
+      setRoomAdminEmail(user.email || null);
+      return;
+    }
+    
+    // Intentar obtener el email del usuario usando una función RPC
+    try {
+      const { data: emailData, error: emailError } = await supabase
+        .rpc('get_user_email', { user_id_param: userId });
+      
+      if (!emailError && emailData) {
+        setRoomAdminEmail(emailData);
+      } else {
+        setRoomAdminEmail(null);
+      }
+    } catch (err) {
+      console.error('Error al obtener email del administrador:', err);
+      setRoomAdminEmail(null);
     }
   };
 
   const enterRoom = (room: Room) => {
+    // Primero limpiar todos los estados relacionados con el lobby
+    setRoomCodeInput('');
+    setRoomCodeError(null);
+    setIsRoomActionLoading(false);
+    
+    // Luego cambiar la vista (esto causa el re-render)
     setRoomCode(room.code);
     setRoomInfo(room);
     setReminders([]);
     localStorage.setItem(ROOM_STORAGE_KEY, room.code);
     setLastRoomCode(room.code);
+    
+    // Obtener el email del administrador
+    fetchAdminEmail(room.user_id);
   };
 
   const handleCreateRoom = async () => {
@@ -326,8 +491,74 @@ export function ReminderApp() {
     }
   };
 
-  const handleRoomCardClick = (room: Room) => {
+  const handleRoomCardClick = async (room: Room) => {
     if (room.is_locked) {
+      // Verificar si tenemos el código guardado
+      const storedCode = getStoredAccessCode(room.id);
+      
+      if (storedCode) {
+        // Intentar entrar automáticamente con el código guardado
+        setIsRoomActionLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('rooms')
+            .select('id, name, code, created_at, is_locked, access_code, user_id')
+            .eq('id', room.id)
+            .single();
+
+          if (error) throw error;
+
+          if (data.access_code && data.access_code === storedCode) {
+            const sanitizedRoom: Room = {
+              id: data.id,
+              name: data.name,
+              code: data.code,
+              created_at: data.created_at,
+              is_locked: data.is_locked,
+              user_id: data.user_id || null,
+            };
+
+            // Agregar al usuario como miembro de la sala (si no es el creador)
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (currentUser && data.user_id !== currentUser.id) {
+              try {
+                await supabase
+                  .from('room_members')
+                  .insert({
+                    user_id: currentUser.id,
+                    room_id: data.id,
+                  })
+                  .select()
+                  .single();
+              } catch (memberError: any) {
+                if (memberError.code !== '23505' && memberError.code !== 'PGRST116' && memberError.code !== '42P01') {
+                  console.warn('No se pudo agregar como miembro de la sala:', memberError);
+                }
+              }
+            }
+
+            enterRoom(sanitizedRoom);
+            setIsRoomActionLoading(false);
+            return;
+          } else {
+            // El código guardado ya no es válido, eliminarlo
+            try {
+              const stored = localStorage.getItem(ROOM_ACCESS_CODES_KEY);
+              if (stored) {
+                const codes = JSON.parse(stored);
+                delete codes[room.id];
+                localStorage.setItem(ROOM_ACCESS_CODES_KEY, JSON.stringify(codes));
+              }
+            } catch {}
+          }
+        } catch (error) {
+          console.error('Error verificando código guardado:', error);
+        } finally {
+          setIsRoomActionLoading(false);
+        }
+      }
+
+      // Si no hay código guardado o no es válido, mostrar el prompt
       setRoomPendingAccess(room);
       setAccessCodeInput('');
       setShowAccessPrompt(true);
@@ -359,6 +590,9 @@ export function ReminderApp() {
       if (error) throw error;
 
       if (data.access_code && data.access_code === accessCodeInput.trim()) {
+        // Guardar el código de acceso para futuras visitas
+        saveAccessCode(data.id, accessCodeInput.trim());
+
         const sanitizedRoom: Room = {
           id: data.id,
           name: data.name,
@@ -367,6 +601,28 @@ export function ReminderApp() {
           is_locked: data.is_locked,
           user_id: data.user_id || null,
         };
+
+        // Agregar al usuario como miembro de la sala (si no es el creador)
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser && data.user_id !== currentUser.id) {
+          try {
+            // Intentar agregar como miembro (ignorar error si ya es miembro)
+            await supabase
+              .from('room_members')
+              .insert({
+                user_id: currentUser.id,
+                room_id: data.id,
+              })
+              .select()
+              .single();
+          } catch (memberError: any) {
+            // Si ya es miembro o la tabla no existe, continuar sin error
+            if (memberError.code !== '23505' && memberError.code !== 'PGRST116' && memberError.code !== '42P01') {
+              console.warn('No se pudo agregar como miembro de la sala:', memberError);
+            }
+          }
+        }
+
         enterRoom(sanitizedRoom);
         setRoomPendingAccess(null);
         setShowAccessPrompt(false);
@@ -389,6 +645,317 @@ export function ReminderApp() {
     setAccessError(null);
   };
 
+  const handleToggleRoomPrivacy = async (room: Room, e?: React.MouseEvent) => {
+    // Prevenir que el click se propague al botón de la tarjeta
+    if (e) {
+      e.stopPropagation();
+    }
+
+    console.log('🔒 handleToggleRoomPrivacy llamado', {
+      roomCode,
+      roomCodeMatch: room.code,
+      user: user?.id,
+      roomUserId: room.user_id,
+      isLocked: room.is_locked,
+      codesMatch: roomCode === room.code
+    });
+
+    // IMPORTANTE: Solo permitir cambiar privacidad desde dentro de la sala
+    // Verificamos que estemos en una sala (roomCode existe) y que sea la misma sala
+    if (!roomCode) {
+      console.warn('❌ No hay roomCode');
+      setRoomActionMessage('Debes estar dentro de una sala para cambiar su privacidad.');
+      return;
+    }
+
+    if (roomCode !== room.code) {
+      console.warn('❌ Los códigos no coinciden', { roomCode, roomCodeMatch: room.code });
+      setRoomActionMessage('Solo puedes cambiar la privacidad desde dentro de la sala.');
+      return;
+    }
+
+    if (!user) {
+      console.warn('❌ No hay usuario');
+      setRoomActionMessage('Debes iniciar sesión para cambiar la privacidad de la sala.');
+      return;
+    }
+
+    // Verificar que el usuario sea el creador de la sala
+    if (room.user_id !== user.id) {
+      console.warn('❌ El usuario no es el creador', { roomUserId: room.user_id, userId: user.id });
+      setRoomActionMessage('Solo el creador de la sala puede cambiar su privacidad.');
+      return;
+    }
+
+    // Si está cambiando de pública a privada, SIEMPRE pedir código
+    if (!room.is_locked) {
+      console.log('✅ Abriendo modal para cambiar a privada');
+      setRoomPendingPrivacyChange(room);
+      setShowPrivacyChangePrompt(true);
+      setPrivacyAccessCodeInput('');
+      setPrivacyAccessError(null);
+      console.log('✅ Estados actualizados', {
+        showPrivacyChangePrompt: true,
+        roomPendingPrivacyChange: room.name
+      });
+      return;
+    }
+
+    // Si está cambiando de privada a pública, pedir código de acceso
+    if (room.is_locked) {
+      console.log('✅ Abriendo modal para cambiar a pública');
+      setRoomPendingMakePublic(room);
+      setShowMakePublicPrompt(true);
+      setMakePublicCodeInput('');
+      setMakePublicError(null);
+      return;
+    }
+  };
+
+  const confirmPrivacyChange = async (room: Room, accessCode: string | null) => {
+    setIsRoomActionLoading(true);
+    setRoomActionMessage(null);
+    setPrivacyAccessError(null);
+
+    try {
+      const newPrivacyStatus = !room.is_locked;
+      const updateData: { is_locked: boolean; access_code?: string | null } = {
+        is_locked: newPrivacyStatus,
+      };
+
+      // Si se está haciendo privada, SIEMPRE debe tener un código de acceso
+      if (newPrivacyStatus) {
+        if (!accessCode || !accessCode.trim()) {
+          setPrivacyAccessError('El código de acceso es obligatorio para hacer la sala privada.');
+          setIsRoomActionLoading(false);
+          return;
+        }
+        updateData.access_code = accessCode.trim();
+      } else {
+        // Si se está haciendo pública, eliminar el código de acceso
+        updateData.access_code = null;
+      }
+
+      const { data, error } = await supabase
+        .from('rooms')
+        .update(updateData)
+        .eq('id', room.id)
+        .select('id, name, code, created_at, is_locked, user_id')
+        .single();
+
+      if (error) {
+        console.error('Error al cambiar privacidad:', error);
+        setRoomActionMessage('No se pudo cambiar la privacidad de la sala. Intenta nuevamente.');
+        setPrivacyAccessError('No se pudo cambiar la privacidad. Intenta nuevamente.');
+        return;
+      }
+
+      // Actualizar el estado local
+      setRooms((prevRooms) =>
+        prevRooms.map((r) => (r.id === room.id ? { ...r, is_locked: newPrivacyStatus } : r))
+      );
+
+      // Si es la sala actual, actualizar también roomInfo
+      if (roomCode === room.code && data) {
+        setRoomInfo(data);
+      }
+
+      setRoomActionMessage(
+        newPrivacyStatus
+          ? 'La sala ahora es privada. Los usuarios necesitarán el código de acceso.'
+          : 'La sala ahora es pública. Cualquiera puede acceder con el código de la sala.'
+      );
+
+      // Cerrar el modal
+      setShowPrivacyChangePrompt(false);
+      setRoomPendingPrivacyChange(null);
+      setPrivacyAccessCodeInput('');
+
+      // Limpiar el mensaje después de 3 segundos
+      setTimeout(() => {
+        setRoomActionMessage(null);
+      }, 3000);
+    } catch (err) {
+      console.error('Error inesperado al cambiar privacidad:', err);
+      setRoomActionMessage('Ocurrió un error inesperado. Intenta nuevamente.');
+      setPrivacyAccessError('Ocurrió un error inesperado. Intenta nuevamente.');
+    } finally {
+      setIsRoomActionLoading(false);
+    }
+  };
+
+  const handlePrivacyChangeSubmit = async () => {
+    if (!roomPendingPrivacyChange) return;
+
+    if (!privacyAccessCodeInput.trim()) {
+      setPrivacyAccessError('El código de acceso es obligatorio para hacer la sala privada.');
+      return;
+    }
+
+    await confirmPrivacyChange(roomPendingPrivacyChange, privacyAccessCodeInput);
+  };
+
+  const handleClosePrivacyChangePrompt = () => {
+    setShowPrivacyChangePrompt(false);
+    setRoomPendingPrivacyChange(null);
+    setPrivacyAccessCodeInput('');
+    setPrivacyAccessError(null);
+  };
+
+  const handleMakePublicSubmit = async () => {
+    if (!roomPendingMakePublic) return;
+
+    if (!makePublicCodeInput.trim()) {
+      setMakePublicError('El código de acceso es obligatorio.');
+      return;
+    }
+
+    setIsRoomActionLoading(true);
+    setMakePublicError(null);
+
+    try {
+      // Verificar el código de acceso
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('id, name, code, created_at, is_locked, access_code, user_id')
+        .eq('id', roomPendingMakePublic.id)
+        .single();
+
+      if (error) throw error;
+
+      if (data.access_code && data.access_code === makePublicCodeInput.trim()) {
+        // Código correcto, cambiar a pública
+        await confirmPrivacyChange(roomPendingMakePublic, null);
+        setShowMakePublicPrompt(false);
+        setRoomPendingMakePublic(null);
+        setMakePublicCodeInput('');
+      } else {
+        setMakePublicError('Código incorrecto. Verifica el código de acceso de la sala.');
+      }
+    } catch (err) {
+      console.error('Error verificando código:', err);
+      setMakePublicError('No pudimos verificar el código. Intenta nuevamente.');
+    } finally {
+      setIsRoomActionLoading(false);
+    }
+  };
+
+  const handleCloseMakePublicPrompt = () => {
+    setShowMakePublicPrompt(false);
+    setRoomPendingMakePublic(null);
+    setMakePublicCodeInput('');
+    setMakePublicError(null);
+  };
+
+  const handleDeleteRoom = async (room: Room) => {
+    // IMPORTANTE: Solo permitir eliminar desde dentro de la sala
+    if (!roomCode || roomCode !== room.code) {
+      setRoomActionMessage('Solo puedes eliminar la sala desde dentro de ella.');
+      return;
+    }
+
+    if (!user) {
+      setRoomActionMessage('Debes iniciar sesión para eliminar la sala.');
+      return;
+    }
+
+    // Verificar que el usuario sea el creador de la sala
+    if (room.user_id !== user.id) {
+      setRoomActionMessage('Solo el creador de la sala puede eliminarla.');
+      return;
+    }
+
+    // Siempre mostrar el modal, pero solo pedir código si es privada
+    setRoomPendingDelete(room);
+    setShowDeleteRoomPrompt(true);
+    setDeleteRoomCodeInput('');
+    setDeleteRoomError(null);
+  };
+
+  const confirmDeleteRoom = async (room: Room, accessCode: string | null) => {
+    setIsRoomActionLoading(true);
+    setDeleteRoomError(null);
+
+    try {
+      // Si la sala es privada, verificar el código
+      if (room.is_locked && accessCode) {
+        const { data, error } = await supabase
+          .from('rooms')
+          .select('id, name, code, created_at, is_locked, access_code, user_id')
+          .eq('id', room.id)
+          .single();
+
+        if (error) throw error;
+
+        if (!data.access_code || data.access_code !== accessCode.trim()) {
+          setDeleteRoomError('Código incorrecto. Verifica el código de acceso de la sala.');
+          setIsRoomActionLoading(false);
+          return;
+        }
+      }
+
+      // Eliminar la sala (esto debería eliminar en cascada los recordatorios si está configurado en la BD)
+      const { error } = await supabase
+        .from('rooms')
+        .delete()
+        .eq('id', room.id);
+
+      if (error) {
+        console.error('Error al eliminar sala:', error);
+        setDeleteRoomError('No se pudo eliminar la sala. Intenta nuevamente.');
+        setIsRoomActionLoading(false);
+        return;
+      }
+
+      // Si es la sala actual, salir de ella
+      if (roomCode === room.code) {
+        handleLeaveRoom(true);
+      }
+
+      // Actualizar la lista de salas
+      await fetchRooms(false);
+
+      setRoomActionMessage('Sala eliminada correctamente.');
+      setShowDeleteRoomPrompt(false);
+      setRoomPendingDelete(null);
+      setDeleteRoomCodeInput('');
+
+      // Limpiar el mensaje después de 3 segundos
+      setTimeout(() => {
+        setRoomActionMessage(null);
+      }, 3000);
+    } catch (err) {
+      console.error('Error inesperado al eliminar sala:', err);
+      setDeleteRoomError('Ocurrió un error inesperado. Intenta nuevamente.');
+    } finally {
+      setIsRoomActionLoading(false);
+    }
+  };
+
+  const handleDeleteRoomSubmit = async () => {
+    if (!roomPendingDelete) return;
+
+    // Si la sala es privada, verificar que se haya ingresado el código
+    if (roomPendingDelete.is_locked) {
+      if (!deleteRoomCodeInput.trim()) {
+        setDeleteRoomError('El código de acceso es obligatorio para eliminar una sala privada.');
+        return;
+      }
+    }
+
+    // Confirmar antes de eliminar
+    if (window.confirm(`¿Estás seguro de eliminar la sala "${roomPendingDelete.name}"? Esta acción eliminará todos los recordatorios de la sala y no se puede deshacer.`)) {
+      await confirmDeleteRoom(roomPendingDelete, roomPendingDelete.is_locked ? deleteRoomCodeInput : null);
+    }
+  };
+
+  const handleCloseDeleteRoomPrompt = () => {
+    setShowDeleteRoomPrompt(false);
+    setRoomPendingDelete(null);
+    setDeleteRoomCodeInput('');
+    setDeleteRoomError(null);
+  };
+
   const handleLeaveRoom = (forgetStored = false) => {
     if (forgetStored) {
       localStorage.removeItem(ROOM_STORAGE_KEY);
@@ -397,6 +964,157 @@ export function ReminderApp() {
     setRoomCode(null);
     setRoomInfo(null);
     setReminders([]);
+  };
+
+  const handleEnterRoomByCode = async () => {
+    if (!roomCodeInput.trim()) {
+      setRoomCodeError('Ingresa el código de la sala.');
+      return;
+    }
+
+    setIsRoomActionLoading(true);
+    setRoomCodeError(null);
+
+    try {
+      // Buscar la sala por código (sin filtrar por user_id, puede ser de cualquier usuario)
+      const { data, error } = await supabase
+        .from('rooms')
+        .select('id, name, code, created_at, is_locked, access_code, user_id')
+        .eq('code', roomCodeInput.trim().toUpperCase())
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          setRoomCodeError('No se encontró una sala con ese código.');
+        } else {
+          throw error;
+        }
+        setIsRoomActionLoading(false);
+        return;
+      }
+
+      // Si la sala es privada, verificar si tenemos el código guardado
+      if (data.is_locked) {
+        const storedCode = getStoredAccessCode(data.id);
+        
+        if (storedCode && data.access_code && data.access_code === storedCode) {
+          // Tenemos el código guardado y es válido, entrar directamente
+          const sanitizedRoom: Room = {
+            id: data.id,
+            name: data.name,
+            code: data.code,
+            created_at: data.created_at,
+            is_locked: data.is_locked,
+            user_id: data.user_id || null,
+          };
+
+          // Agregar al usuario como miembro de la sala (si no es el creador)
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser && data.user_id !== currentUser.id) {
+            try {
+              await supabase
+                .from('room_members')
+                .insert({
+                  user_id: currentUser.id,
+                  room_id: data.id,
+                })
+                .select()
+                .single();
+            } catch (memberError: any) {
+              if (memberError.code !== '23505' && memberError.code !== 'PGRST116' && memberError.code !== '42P01') {
+                console.warn('No se pudo agregar como miembro de la sala:', memberError);
+              }
+            }
+          }
+
+          setRoomCodeInput('');
+          setRoomCodeError(null);
+          setIsRoomActionLoading(false);
+          
+          if (window.requestIdleCallback) {
+            requestIdleCallback(() => {
+              enterRoom(sanitizedRoom);
+            }, { timeout: 100 });
+          } else {
+            setTimeout(() => {
+              enterRoom(sanitizedRoom);
+            }, 100);
+          }
+          return;
+        }
+
+        // Si no hay código guardado o no es válido, mostrar el prompt
+        setRoomPendingAccess({
+          id: data.id,
+          name: data.name,
+          code: data.code,
+          created_at: data.created_at,
+          is_locked: data.is_locked,
+          user_id: data.user_id || null,
+        });
+        setAccessCodeInput('');
+        setShowAccessPrompt(true);
+        setAccessError(null);
+        setRoomCodeInput('');
+        setIsRoomActionLoading(false);
+        return;
+      }
+
+      // Si es pública, agregar al usuario como miembro y entrar
+      const sanitizedRoom: Room = {
+        id: data.id,
+        name: data.name,
+        code: data.code,
+        created_at: data.created_at,
+        is_locked: data.is_locked,
+        user_id: data.user_id || null,
+      };
+
+      // Agregar al usuario como miembro de la sala (si no es el creador)
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser && data.user_id !== currentUser.id) {
+        try {
+          // Intentar agregar como miembro (ignorar error si ya es miembro)
+          await supabase
+            .from('room_members')
+            .insert({
+              user_id: currentUser.id,
+              room_id: data.id,
+            })
+            .select()
+            .single();
+        } catch (memberError: any) {
+          // Si ya es miembro o la tabla no existe, continuar sin error
+          if (memberError.code !== '23505' && memberError.code !== 'PGRST116' && memberError.code !== '42P01') {
+            console.warn('No se pudo agregar como miembro de la sala:', memberError);
+          }
+        }
+      }
+      
+      // Limpiar el input y errores primero
+      const roomToEnter = sanitizedRoom;
+      setRoomCodeInput('');
+      setRoomCodeError(null);
+      
+      // Limpiar el loading ANTES de cambiar de vista
+      setIsRoomActionLoading(false);
+      
+      // Usar requestIdleCallback o setTimeout para asegurar que React termine de renderizar
+      // antes de cambiar de vista, evitando el error de insertBefore
+      if (window.requestIdleCallback) {
+        requestIdleCallback(() => {
+          enterRoom(roomToEnter);
+        }, { timeout: 100 });
+      } else {
+        setTimeout(() => {
+          enterRoom(roomToEnter);
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error al entrar a la sala:', error);
+      setRoomCodeError('No se pudo acceder a la sala. Verifica el código e intenta nuevamente.');
+      setIsRoomActionLoading(false);
+    }
   };
 
   const handleResumeLastRoom = async () => {
@@ -450,11 +1168,12 @@ export function ReminderApp() {
 
       if (error) throw error;
 
-      // Cargar etiquetas para cada recordatorio (con manejo de errores robusto)
+      // Cargar etiquetas y responsables múltiples para cada recordatorio (con manejo de errores robusto)
       // Usar Promise.allSettled para que un error en un recordatorio no rompa todos
       const remindersWithTags = await Promise.allSettled(
         (data || []).map(async (reminder: any) => {
           let tags: any[] = [];
+          let assignees: any[] = [];
           try {
             const { data: tagAssignments, error: tagError } = await supabase
               .from('reminder_tag_assignments')
@@ -478,12 +1197,38 @@ export function ReminderApp() {
             // Silenciar el error
           }
 
+          // Cargar responsables múltiples (reminder_assignees -> people)
+          try {
+            const { data: assigneeRows, error: assigneesError } = await supabase
+              .from('reminder_assignees')
+              .select('person_id')
+              .eq('reminder_id', reminder.id);
+
+            if (!assigneesError && assigneeRows && assigneeRows.length > 0) {
+              const personIds = assigneeRows.map((row: any) => row.person_id).filter(Boolean);
+              if (personIds.length > 0) {
+                const { data: peopleData, error: peopleError } = await supabase
+                  .from('people')
+                  .select('id, name, email, area, created_at')
+                  .in('id', personIds);
+
+                if (!peopleError && peopleData) {
+                  assignees = peopleData;
+                }
+              }
+            }
+          } catch (err) {
+            // Si la tabla no existe o falla, continuar sin responsables múltiples
+            console.warn('Error al cargar responsables múltiples:', err);
+          }
+
           return {
             ...reminder,
             priority: reminder.priority || 'medium',
             assigned_to: reminder.assigned_to || null,
             progress: reminder.progress ?? 0,
             tags: tags,
+            assignees,
           };
         })
       );
@@ -540,6 +1285,12 @@ export function ReminderApp() {
         console.warn('No se pudo agregar priority:', e);
       }
 
+      // Responsable principal = primer seleccionado en la lista múltiple (si existe)
+      const primaryAssignee = newAssignedPeopleIds[0] || newAssignedTo || null;
+      if (primaryAssignee) {
+        insertData.assigned_to = primaryAssignee;
+      }
+
       // Intentar insertar primero
       let { data, error } = await supabase
         .from('reminders')
@@ -579,8 +1330,8 @@ export function ReminderApp() {
         }
 
         // Intentar actualizar assigned_to si hay uno
-        if (newAssignedTo && (!data.assigned_to || data.assigned_to !== newAssignedTo)) {
-          updates.assigned_to = newAssignedTo;
+        if (primaryAssignee && (!data.assigned_to || data.assigned_to !== primaryAssignee)) {
+          updates.assigned_to = primaryAssignee;
           needsUpdate = true;
         }
 
@@ -652,12 +1403,30 @@ export function ReminderApp() {
           }
         }
 
-        setReminders([normalizedData, ...reminders]);
+        // Si hay responsables múltiples seleccionados, guardarlos
+        if (newAssignedPeopleIds.length > 0) {
+          try {
+            await supabase
+              .from('reminder_assignees')
+              .insert(
+                newAssignedPeopleIds.map((personId) => ({
+                  reminder_id: data.id,
+                  person_id: personId,
+                }))
+              );
+          } catch (err) {
+            console.warn('No se pudieron guardar los responsables múltiples del nuevo recordatorio:', err);
+          }
+        }
+
+        // Recargar la lista de recordatorios para que traiga tags y assignees correctamente
+        await fetchReminders(roomCode, false);
         setNewTitle('');
         setNewDescription('');
         setNewDueDate('');
         setNewPriority('medium');
         setNewAssignedTo(null);
+        setNewAssignedPeopleIds([]);
         setNewTags([]);
         setIsAddingNew(false);
       }
@@ -700,9 +1469,49 @@ export function ReminderApp() {
       }
 
       if (data) {
+        // Preservar assignees y tags del reminder original, luego recargar assignees
+        const currentReminder = reminders.find((r) => r.id === id);
+        const preservedAssignees = currentReminder?.assignees || [];
+        
+        // Recargar assignees actualizados desde la base de datos
+        let updatedAssignees: any[] = [];
+        try {
+          const { data: assigneeRows } = await supabase
+            .from('reminder_assignees')
+            .select('person_id')
+            .eq('reminder_id', id);
+
+          if (assigneeRows && assigneeRows.length > 0) {
+            const personIds = assigneeRows.map((row: any) => row.person_id).filter(Boolean);
+            if (personIds.length > 0) {
+              const { data: peopleData } = await supabase
+                .from('people')
+                .select('id, name, email, created_at')
+                .in('id', personIds);
+
+              if (peopleData) {
+                updatedAssignees = peopleData;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Error al recargar assignees después de actualizar:', err);
+          // Usar los assignees preservados si falla la carga
+          updatedAssignees = preservedAssignees;
+        }
+
         setReminders(
           reminders.map((reminder) =>
-            reminder.id === id ? data : reminder
+            reminder.id === id
+              ? {
+                  ...reminder,
+                  ...data,
+                  priority: data.priority || reminder.priority || 'medium',
+                  assigned_to: data.assigned_to || null,
+                  assignees: updatedAssignees,
+                  tags: reminder.tags || [], // Preservar tags
+                }
+              : reminder
           )
         );
       } else {
@@ -710,13 +1519,13 @@ export function ReminderApp() {
           reminders.map((reminder) =>
             reminder.id === id
               ? {
-                ...reminder,
-                title: title.trim(),
-                description: description.trim(),
-                due_date: dueDate,
-                priority: priority ?? reminder.priority ?? 'medium',
-                assigned_to: assignedTo ?? reminder.assigned_to,
-              }
+                  ...reminder,
+                  title: title.trim(),
+                  description: description.trim(),
+                  due_date: dueDate,
+                  priority: priority ?? reminder.priority ?? 'medium',
+                  assigned_to: assignedTo ?? reminder.assigned_to,
+                }
               : reminder
           )
         );
@@ -933,37 +1742,111 @@ export function ReminderApp() {
   if (!roomCode) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-all duration-300 flex flex-col">
-        {/* Header con Logo y Logout - Full Width */}
+        {/* Toast de confirmación de copia */}
+        {copyConfirmMessage && (
+          <div className="fixed top-4 right-4 z-[10000] animate-slideDown">
+            <div className="bg-green-500 dark:bg-green-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-green-400 dark:border-green-500">
+              <div className="flex-shrink-0">
+                {copyConfirmMessage.startsWith('✓') ? (
+                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                    <span className="text-lg">✓</span>
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <span className="text-lg">✗</span>
+                  </div>
+                )}
+              </div>
+              <p className="font-semibold text-sm">{copyConfirmMessage}</p>
+            </div>
+          </div>
+        )}
+        {/* Header con Logo, Email y Logout - Full Width */}
         <div className="flex justify-between items-center px-6 py-6">
           <img
             src="/Logo Mi Gusto 2025.png"
             alt="Logo Mi Gusto"
             className="h-16 w-auto object-contain drop-shadow-md"
           />
-          <button
-            onClick={() => signOut()}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm"
-            title="Cerrar sesión"
-          >
-            <LogOut size={18} />
-            Cerrar sesión
-          </button>
+          <div className="flex items-center gap-4">
+            {user?.email && (
+              <div className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  {user.email}
+                </p>
+              </div>
+            )}
+            <button
+              onClick={() => signOut()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm"
+              title="Cerrar sesión"
+            >
+              <LogOut size={18} />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
 
         <div className="max-w-5xl mx-auto px-6 space-y-10 pb-12 flex-1 w-full">
           {lobbyHeader}
 
-          {lastRoomCode && (
-            <div className="flex justify-center">
-              <button
-                onClick={handleResumeLastRoom}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 dark:bg-gray-800/80 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300 font-semibold shadow hover:shadow-lg transition-all"
-              >
-                <Users size={18} />
-                Reanudar mi sala guardada ({lastRoomCode})
-              </button>
+          <div className="flex justify-center">
+            <div className="w-full max-w-md bg-white/80 dark:bg-gray-900/70 backdrop-blur rounded-3xl shadow-2xl border border-white/40 dark:border-gray-800 p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Ingresar a una sala por código</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Ingresa el código de la sala para acceder directamente.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={roomCodeInput}
+                  onChange={(e) => {
+                    setRoomCodeInput(e.target.value.toUpperCase());
+                    setRoomCodeError(null);
+                  }}
+                  placeholder="Ej: E5JXZZE"
+                  className="flex-1 px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none transition-all font-mono uppercase tracking-widest text-center"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleEnterRoomByCode();
+                    }
+                  }}
+                  maxLength={10}
+                />
+                <button
+                  onClick={handleEnterRoomByCode}
+                  disabled={isRoomActionLoading || !roomCodeInput.trim()}
+                  className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[120px]"
+                >
+                  {isRoomActionLoading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Entrando...</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <DoorOpen size={18} />
+                      <span>Entrar</span>
+                    </span>
+                  )}
+                </button>
+              </div>
+              {roomCodeError && (
+                <p className="text-sm text-red-600 dark:text-red-400 text-center">{roomCodeError}</p>
+              )}
+              {lastRoomCode && (
+                <button
+                  onClick={handleResumeLastRoom}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-sm"
+                >
+                  <Users size={16} />
+                  Reanudar mi sala guardada ({lastRoomCode})
+                </button>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="bg-white/80 dark:bg-gray-900/70 backdrop-blur rounded-3xl shadow-2xl border border-white/40 dark:border-gray-800 p-6 md:p-8 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1006,41 +1889,45 @@ export function ReminderApp() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {rooms.map((room) => (
-                  <button
+                  <div
                     key={room.id}
-                    onClick={() => handleRoomCardClick(room)}
-                    className="text-left p-5 rounded-2xl border-2 border-transparent bg-white/80 dark:bg-gray-800/80 hover:border-blue-500 dark:hover:border-blue-400 hover:-translate-y-1 transition-all shadow-lg"
+                    className="relative p-5 rounded-2xl border-2 border-transparent bg-white/80 dark:bg-gray-800/80 hover:border-blue-500 dark:hover:border-blue-400 hover:-translate-y-1 transition-all shadow-lg"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white break-words">{room.name}</h3>
-                      <span
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${room.is_locked
-                          ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
-                          : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-300'
-                          }`}
-                      >
-                        {room.is_locked ? <Lock size={14} /> : <Unlock size={14} />}
-                        {room.is_locked ? 'Privada' : 'Pública'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                      Creada el{' '}
-                      {new Date(room.created_at).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </p>
-                    {room.code === lastRoomCode && (
-                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-300 uppercase tracking-widest">
-                        Mi última sala
+                    <button
+                      onClick={() => handleRoomCardClick(room)}
+                      className="text-left w-full"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white break-words">{room.name}</h3>
+                        <span
+                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${room.is_locked
+                            ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
+                            : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-300'
+                            }`}
+                        >
+                          {room.is_locked ? <Lock size={14} /> : <Unlock size={14} />}
+                          {room.is_locked ? 'Privada' : 'Pública'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Creada el{' '}
+                        {new Date(room.created_at).toLocaleDateString('es-ES', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
                       </p>
-                    )}
-                    <div className="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
-                      <span className="font-semibold">Entrar a la sala</span>
-                      <Plus size={16} />
-                    </div>
-                  </button>
+                      {room.code === lastRoomCode && (
+                        <p className="text-xs font-semibold text-blue-600 dark:text-blue-300 uppercase tracking-widest">
+                          Mi última sala
+                        </p>
+                      )}
+                      <div className="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
+                        <span className="font-semibold">Entrar a la sala</span>
+                        <Plus size={16} />
+                      </div>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -1161,12 +2048,33 @@ export function ReminderApp() {
             </div>
           </div>
         )}
+
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-all duration-300">
+      {/* Toast de confirmación de copia */}
+      {copyConfirmMessage && (
+        <div className="fixed top-4 right-4 z-[10000] animate-slideDown">
+          <div className="bg-green-500 dark:bg-green-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-green-400 dark:border-green-500">
+            <div className="flex-shrink-0">
+              {copyConfirmMessage.startsWith('✓') ? (
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                  <span className="text-lg">✓</span>
+                </div>
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <span className="text-lg">✗</span>
+                </div>
+              )}
+            </div>
+            <p className="font-semibold text-sm">{copyConfirmMessage}</p>
+          </div>
+        </div>
+      )}
+
       <div className="h-screen flex flex-col">
         <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-b-2 border-gray-200 dark:border-gray-700 px-6 py-4 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1197,25 +2105,78 @@ export function ReminderApp() {
                 </div>
                 <button
                   onClick={() => handleLeaveRoom(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="flex items-center gap-3 px-6 py-3 rounded-xl border-2 border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-base font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
                 >
-                  <DoorOpen size={18} />
+                  <DoorOpen size={24} />
                   Cambiar sala
                 </button>
                 {roomCode && (
                   <button
-                    onClick={() => navigator.clipboard?.writeText(roomCode)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs font-mono uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try {
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                          await navigator.clipboard.writeText(roomCode);
+                          setCopyConfirmMessage('✓ Código copiado al portapapeles');
+                          setTimeout(() => {
+                            setCopyConfirmMessage(null);
+                          }, 3000);
+                        } else {
+                          // Fallback para navegadores que no soportan clipboard API
+                          const textArea = document.createElement('textarea');
+                          textArea.value = roomCode;
+                          textArea.style.position = 'fixed';
+                          textArea.style.opacity = '0';
+                          document.body.appendChild(textArea);
+                          textArea.select();
+                          try {
+                            document.execCommand('copy');
+                            setCopyConfirmMessage('✓ Código copiado al portapapeles');
+                            setTimeout(() => {
+                              setCopyConfirmMessage(null);
+                            }, 3000);
+                          } catch (err) {
+                            setCopyConfirmMessage('✗ No se pudo copiar el código');
+                            setTimeout(() => {
+                              setCopyConfirmMessage(null);
+                            }, 3000);
+                          }
+                          document.body.removeChild(textArea);
+                        }
+                      } catch (err) {
+                        console.error('Error al copiar:', err);
+                        setCopyConfirmMessage('✗ Error al copiar el código');
+                        setTimeout(() => {
+                          setCopyConfirmMessage(null);
+                        }, 3000);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs font-mono uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all cursor-pointer"
                     title="Copiar código de sala"
                   >
                     <Copy size={16} />
                     {roomCode}
                   </button>
                 )}
+                {roomAdminEmail && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                    Admin: {roomAdminEmail}
+                  </span>
+                )}
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              {user?.email && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                  <Mail size={16} className="text-gray-500 dark:text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {user.email}
+                  </span>
+                </div>
+              )}
+              
               <button
                 onClick={() => setViewMode(viewMode === 'cards' ? 'calendar' : 'cards')}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
@@ -1386,11 +2347,16 @@ export function ReminderApp() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Asignado a</label>
-                      <PersonSelector
-                        value={newAssignedTo}
-                        onChange={setNewAssignedTo}
-                        placeholder="Seleccionar responsable..."
+                      <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">
+                        Asignado a
+                      </label>
+                      <MultiPersonSelector
+                        values={newAssignedPeopleIds}
+                        onChange={(ids) => {
+                          setNewAssignedPeopleIds(ids);
+                          setNewAssignedTo(ids[0] || null);
+                        }}
+                        placeholder="Seleccionar responsables..."
                       />
                     </div>
                   </div>
@@ -1493,6 +2459,180 @@ export function ReminderApp() {
         </footer>
       </div>
 
+      {/* Modal para hacer pública (pedir código) - Fuera del contenedor principal */}
+      {showMakePublicPrompt && roomPendingMakePublic && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+          onClick={(e) => {
+            // Cerrar modal al hacer click fuera
+            if (e.target === e.currentTarget) {
+              handleCloseMakePublicPrompt();
+            }
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md border border-orange-200 dark:border-orange-900 p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-orange-500 dark:text-orange-300">Cambiar privacidad</p>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {roomPendingMakePublic?.name}
+                </h3>
+              </div>
+              <button
+                onClick={handleCloseMakePublicPrompt}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <X size={20} className="text-gray-500 dark:text-gray-400" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Para hacer esta sala pública, necesitas ingresar el código de acceso actual de la sala privada.
+            </p>
+            <div className="flex items-center gap-3 p-4 rounded-2xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+              <Lock size={20} className="text-orange-600 dark:text-orange-400" />
+              <div>
+                <p className="text-xs uppercase tracking-widest text-orange-600 dark:text-orange-400">Código de acceso requerido</p>
+                <p className="text-sm text-gray-800 dark:text-gray-200">
+                  Ingresa el código de acceso de la sala para confirmar.
+                </p>
+              </div>
+            </div>
+            <input
+              type="text"
+              value={makePublicCodeInput}
+              onChange={(e) => {
+                setMakePublicCodeInput(e.target.value);
+                setMakePublicError(null);
+              }}
+              placeholder="Ingresa el código de acceso"
+              className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 dark:focus:ring-orange-900 outline-none transition-all"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleMakePublicSubmit();
+                }
+              }}
+              autoFocus
+            />
+            {makePublicError && (
+              <p className="text-sm text-red-600 dark:text-red-400 text-center">{makePublicError}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={handleMakePublicSubmit}
+                disabled={isRoomActionLoading || !makePublicCodeInput.trim()}
+                className="flex-1 px-4 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isRoomActionLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    Verificando...
+                  </span>
+                ) : (
+                  'Hacer pública'
+                )}
+              </button>
+              <button
+                onClick={handleCloseMakePublicPrompt}
+                className="px-4 py-3 rounded-2xl border-2 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para cambiar privacidad de pública a privada - Fuera del contenedor principal */}
+      {showPrivacyChangePrompt && roomPendingPrivacyChange && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+          onClick={(e) => {
+            // Cerrar modal al hacer click fuera
+            if (e.target === e.currentTarget) {
+              handleClosePrivacyChangePrompt();
+            }
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md border border-purple-200 dark:border-purple-900 p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-purple-500 dark:text-purple-300">Cambiar privacidad</p>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {roomPendingPrivacyChange?.name}
+                </h3>
+              </div>
+              <button
+                onClick={handleClosePrivacyChangePrompt}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <X size={20} className="text-gray-500 dark:text-gray-400" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Para hacer esta sala privada, necesitas establecer un código de acceso. Los usuarios necesitarán este código para entrar.
+            </p>
+            <div className="flex items-center gap-3 p-4 rounded-2xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+              <Lock size={20} className="text-purple-600 dark:text-purple-400" />
+              <div>
+                <p className="text-xs uppercase tracking-widest text-purple-600 dark:text-purple-400">Código de acceso</p>
+                <p className="text-sm text-gray-800 dark:text-gray-200">
+                  Este código será requerido para acceder a la sala.
+                </p>
+              </div>
+            </div>
+            <input
+              type="text"
+              value={privacyAccessCodeInput}
+              onChange={(e) => {
+                setPrivacyAccessCodeInput(e.target.value);
+                setPrivacyAccessError(null);
+              }}
+              placeholder="Ingresa el código de acceso"
+              className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-900 outline-none transition-all"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handlePrivacyChangeSubmit();
+                }
+              }}
+              autoFocus
+            />
+            {privacyAccessError && (
+              <p className="text-sm text-red-600 dark:text-red-400 text-center">{privacyAccessError}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={handlePrivacyChangeSubmit}
+                disabled={isRoomActionLoading || !privacyAccessCodeInput.trim()}
+                className="flex-1 px-4 py-3 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isRoomActionLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    Cambiando...
+                  </span>
+                ) : (
+                  'Hacer privada'
+                )}
+              </button>
+              <button
+                onClick={handleClosePrivacyChangePrompt}
+                className="px-4 py-3 rounded-2xl border-2 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {expandedReminder && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
           <ReminderCard
@@ -1509,15 +2649,116 @@ export function ReminderApp() {
         </div>
       )}
 
+      {/* Modal para eliminar sala */}
+      {showDeleteRoomPrompt && roomPendingDelete && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCloseDeleteRoomPrompt();
+            }
+          }}
+        >
+          <div 
+            className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md border border-red-200 dark:border-red-900 p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-red-500 dark:text-red-300">Eliminar sala</p>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {roomPendingDelete?.name}
+                </h3>
+              </div>
+              <button
+                onClick={handleCloseDeleteRoomPrompt}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <X size={20} className="text-gray-500 dark:text-gray-400" />
+              </button>
+            </div>
+            <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">
+                ⚠️ Esta acción no se puede deshacer
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                Se eliminarán todos los recordatorios, etiquetas y datos asociados a esta sala.
+              </p>
+            </div>
+            {roomPendingDelete.is_locked && (
+              <>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Para eliminar esta sala privada, necesitas ingresar el código de acceso.
+                </p>
+                <div className="flex items-center gap-3 p-4 rounded-2xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                  <Lock size={20} className="text-orange-600 dark:text-orange-400" />
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-orange-600 dark:text-orange-400">Código de acceso requerido</p>
+                    <p className="text-sm text-gray-800 dark:text-gray-200">
+                      Ingresa el código de acceso de la sala para confirmar.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={deleteRoomCodeInput}
+                  onChange={(e) => {
+                    setDeleteRoomCodeInput(e.target.value);
+                    setDeleteRoomError(null);
+                  }}
+                  placeholder="Ingresa el código de acceso"
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:border-red-500 focus:ring-2 focus:ring-red-200 dark:focus:ring-red-900 outline-none transition-all"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleDeleteRoomSubmit();
+                    }
+                  }}
+                  autoFocus
+                />
+                {deleteRoomError && (
+                  <p className="text-sm text-red-600 dark:text-red-400 text-center">{deleteRoomError}</p>
+                )}
+              </>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteRoomSubmit}
+                disabled={isRoomActionLoading || (roomPendingDelete.is_locked && !deleteRoomCodeInput.trim())}
+                className="flex-1 px-4 py-3 rounded-2xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isRoomActionLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    Eliminando...
+                  </span>
+                ) : (
+                  'Eliminar sala'
+                )}
+              </button>
+              <button
+                onClick={handleCloseDeleteRoomPrompt}
+                className="px-4 py-3 rounded-2xl border-2 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
         isDark={isDark}
         onToggleDark={() => setIsDark(!isDark)}
-        onClearAll={handleClearAll}
         onExport={handleExport}
         onImport={handleImport}
         onOpenPeopleManager={() => setShowPeopleManager(true)}
+        roomInfo={roomInfo}
+        currentUserId={user?.id || null}
+        onToggleRoomPrivacy={() => roomInfo && handleToggleRoomPrivacy(roomInfo)}
+        onDeleteRoom={() => roomInfo && handleDeleteRoom(roomInfo)}
       />
 
       <PeopleManager

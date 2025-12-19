@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pencil, Trash2, Save, X, Calendar, Clock, Send, Loader2, AlertTriangle, User, Flag } from 'lucide-react';
 import { supabase, type Reminder, type ReminderComment, type Priority, type Person } from '../lib/supabase';
-import { PersonSelector } from './PersonSelector';
+import { MultiPersonSelector } from './MultiPersonSelector';
 import { TagSelector } from './TagSelector';
 
 interface ReminderCardProps {
@@ -32,6 +32,15 @@ export function ReminderCard({
   const [priority, setPriority] = useState<Priority>(reminder.priority || 'medium');
   const [assignedTo, setAssignedTo] = useState<string | null>(reminder.assigned_to || null);
   const [assignedPerson, setAssignedPerson] = useState<Person | null>(null);
+  const [assignedPeopleIds, setAssignedPeopleIds] = useState<string[]>(() => {
+    if (reminder.assignees && reminder.assignees.length > 0) {
+      return reminder.assignees.map((p) => p.id);
+    }
+    if (reminder.assigned_to) {
+      return [reminder.assigned_to];
+    }
+    return [];
+  });
   const [selectedTags, setSelectedTags] = useState<string[]>(reminder.tags?.map(t => t.id) || []);
   const [isLoading, setIsLoading] = useState(false);
   const [comments, setComments] = useState<ReminderComment[]>([]);
@@ -45,14 +54,14 @@ export function ReminderCard({
   const [savedProgress, setSavedProgress] = useState(reminder.progress ?? 0);
   const [isProgressUpdating, setIsProgressUpdating] = useState(false);
 
-  // Cargar información de la persona asignada
+  // Cargar información de la persona asignada y actualizar IDs cuando cambia el reminder
   useEffect(() => {
     const loadAssignedPerson = async () => {
       if (reminder.assigned_to) {
         try {
           const { data, error } = await supabase
             .from('people')
-            .select('id, name, email, created_at')
+            .select('id, name, email, area, created_at')
             .eq('id', reminder.assigned_to)
             .single();
 
@@ -69,14 +78,24 @@ export function ReminderCard({
     };
 
     loadAssignedPerson();
-  }, [reminder.assigned_to]);
+
+    // Actualizar assignedPeopleIds cuando cambia el reminder
+    if (reminder.assignees && reminder.assignees.length > 0) {
+      setAssignedPeopleIds(reminder.assignees.map((p) => p.id));
+    } else if (reminder.assigned_to) {
+      setAssignedPeopleIds([reminder.assigned_to]);
+    } else {
+      setAssignedPeopleIds([]);
+    }
+  }, [reminder.assigned_to, reminder.assignees]);
 
   const handleSave = async () => {
     if (!title.trim()) return;
 
     setIsLoading(true);
     try {
-      await onUpdate(reminder.id, title, description, dueDate || null, priority, assignedTo);
+      const primaryAssignee = assignedPeopleIds[0] || null;
+      await onUpdate(reminder.id, title, description, dueDate || null, priority, primaryAssignee);
       
       // Actualizar etiquetas
       if (reminder.room_code) {
@@ -114,6 +133,39 @@ export function ReminderCard({
         }
       }
 
+      // Actualizar responsables múltiples
+      try {
+        const { data: currentAssignees } = await supabase
+          .from('reminder_assignees')
+          .select('person_id')
+          .eq('reminder_id', reminder.id);
+
+        const currentIds = (currentAssignees || []).map((a: any) => a.person_id);
+        const idsToAdd = assignedPeopleIds.filter((id) => !currentIds.includes(id));
+        const idsToRemove = currentIds.filter((id: string) => !assignedPeopleIds.includes(id));
+
+        if (idsToAdd.length > 0) {
+          await supabase
+            .from('reminder_assignees')
+            .insert(
+              idsToAdd.map((personId) => ({
+                reminder_id: reminder.id,
+                person_id: personId,
+              }))
+            );
+        }
+
+        if (idsToRemove.length > 0) {
+          await supabase
+            .from('reminder_assignees')
+            .delete()
+            .eq('reminder_id', reminder.id)
+            .in('person_id', idsToRemove);
+        }
+      } catch (err) {
+        console.warn('No se pudieron actualizar los responsables múltiples:', err);
+      }
+
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating reminder:', error);
@@ -128,6 +180,7 @@ export function ReminderCard({
     setDueDate(reminder.due_date ? reminder.due_date.split('T')[0] : '');
     setPriority(reminder.priority || 'medium');
     setAssignedTo(reminder.assigned_to || null);
+    setAssignedPeopleIds(reminder.assignees?.map((p) => p.id) || (reminder.assigned_to ? [reminder.assigned_to] : []));
     setSelectedTags(reminder.tags?.map(t => t.id) || []);
     setIsEditing(false);
   };
@@ -373,11 +426,16 @@ useEffect(() => {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">Asignado a</label>
-                <PersonSelector
-                  value={assignedTo}
-                  onChange={setAssignedTo}
-                  placeholder="Seleccionar responsable..."
+                <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 block">
+                  Asignado a
+                </label>
+                <MultiPersonSelector
+                  values={assignedPeopleIds}
+                  onChange={(ids) => {
+                    setAssignedPeopleIds(ids);
+                    setAssignedTo(ids[0] || null);
+                  }}
+                  placeholder="Seleccionar responsables..."
                   disabled={isLoading}
                 />
               </div>
@@ -426,12 +484,20 @@ useEffect(() => {
                   {getPriorityLabel(reminder.priority || 'medium')}
                 </span>
               </div>
-              <div className={`flex items-center gap-2 text-sm mt-2 px-2 py-1 rounded-lg ${assignedPerson 
-                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' 
-                : 'text-gray-400 dark:text-gray-500'}`}>
+              <div className={`flex items-center gap-2 text-sm mt-2 px-2 py-1 rounded-lg ${
+                (reminder.assignees && reminder.assignees.length > 0) || assignedPerson
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                  : 'text-gray-400 dark:text-gray-500'
+              }`}>
                 <User size={14} />
-                <span className={assignedPerson ? 'font-semibold' : 'italic'}>
-                  {assignedPerson ? assignedPerson.name : 'Sin responsable asignado'}
+                <span className={(reminder.assignees && reminder.assignees.length > 0) || assignedPerson ? 'font-semibold' : 'italic'}>
+                  {reminder.assignees && reminder.assignees.length > 1
+                    ? `Asignado a ${reminder.assignees.length} personas`
+                    : reminder.assignees && reminder.assignees.length === 1
+                      ? reminder.assignees[0].name
+                      : assignedPerson
+                        ? assignedPerson.name
+                        : 'Sin responsable asignado'}
                 </span>
               </div>
               {reminder.tags && reminder.tags.length > 0 && (

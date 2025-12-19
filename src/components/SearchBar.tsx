@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Search, X, SlidersHorizontal, ArrowUpDown, Filter } from 'lucide-react';
 import type { Priority } from '../lib/supabase';
 
@@ -38,30 +39,46 @@ export function SearchBar({
   onTagFilterChange,
   availableTags = []
 }: SearchBarProps) {
+  const [showFilters, setShowFilters] = useState(false);
+
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Buscar recordatorios..."
-          className="w-full pl-12 pr-12 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700
-            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-            focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-        />
-        {searchTerm && (
-          <button
-            onClick={() => onSearchChange('')}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            <X size={18} className="text-gray-400" />
-          </button>
-        )}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Buscar recordatorios..."
+            className="w-full pl-12 pr-12 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700
+              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+              focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => onSearchChange('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <X size={18} className="text-gray-400" />
+            </button>
+          )}
+        </div>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`px-4 py-3 rounded-xl border-2 transition-colors flex items-center gap-2
+            ${showFilters 
+              ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' 
+              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+        >
+          <SlidersHorizontal size={20} />
+          <span className="font-medium text-sm">Filtros</span>
+        </button>
       </div>
 
-      <div className="flex gap-3 flex-wrap">
+      {showFilters && (
+        <div className="flex gap-3 flex-wrap animate-fadeIn">
         <div className="flex items-center gap-2 flex-1 min-w-[200px]">
           <SlidersHorizontal size={18} className="text-gray-500 dark:text-gray-400" />
           <select
@@ -157,6 +174,7 @@ export function SearchBar({
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }
