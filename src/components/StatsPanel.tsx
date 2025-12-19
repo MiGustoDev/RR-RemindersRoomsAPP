@@ -28,7 +28,7 @@ export function StatsPanel({ reminders }: StatsPanelProps) {
   const high = reminders.filter(r => r.priority === 'high').length;
   const medium = reminders.filter(r => r.priority === 'medium').length;
   const low = reminders.filter(r => r.priority === 'low').length;
-  
+
   // Estadísticas de asignación
   const assigned = reminders.filter(r => r.assigned_to).length;
   const unassigned = reminders.filter(r => !r.assigned_to).length;
@@ -57,7 +57,7 @@ export function StatsPanel({ reminders }: StatsPanelProps) {
         <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Estadísticas</h3>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle2 size={20} className="text-green-500" />
@@ -138,7 +138,7 @@ export function StatsPanel({ reminders }: StatsPanelProps) {
           <Target size={18} className="text-green-500" />
           <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Progreso</h4>
         </div>
-        <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
           <div>
             <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Completados</div>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">{completed}</div>
@@ -175,7 +175,7 @@ export function StatsPanel({ reminders }: StatsPanelProps) {
           <Flag size={18} className="text-purple-500" />
           <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Etiquetas</h4>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Con etiquetas</div>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{remindersWithTags}</div>
@@ -192,7 +192,7 @@ export function StatsPanel({ reminders }: StatsPanelProps) {
           <Flag size={20} className="text-purple-500" />
           <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Por Prioridad</h4>
         </div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
             <div className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">Urgente</div>
             <div className="text-xl font-bold text-red-700 dark:text-red-300">{urgent}</div>
@@ -217,7 +217,7 @@ export function StatsPanel({ reminders }: StatsPanelProps) {
           <User size={18} className="text-indigo-500" />
           <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Asignación</h4>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Asignados</div>
             <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{assigned}</div>

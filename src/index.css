@@ -91,6 +91,16 @@
   .animate-shake {
     animation: shake 0.4s ease-in-out;
   }
+
+  /* No Scrollbar Utility */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
 }
 
 :root {
@@ -101,37 +111,40 @@
   color-scheme: dark;
 }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgb(156 163 175) transparent;
-}
+/* Custom Scrollbar for Desktop (except where no-scrollbar is applied) */
+@media (min-width: 768px) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(156 163 175) transparent;
+  }
 
-.dark * {
-  scrollbar-color: rgb(75 85 99) transparent;
-}
+  .dark * {
+    scrollbar-color: rgb(75 85 99) transparent;
+  }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: rgb(156 163 175);
-  border-radius: 4px;
-}
+  ::-webkit-scrollbar-thumb {
+    background: rgb(156 163 175);
+    border-radius: 4px;
+  }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: rgb(75 85 99);
-}
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgb(75 85 99);
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgb(107 114 128);
-}
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(107 114 128);
+  }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgb(55 65 81);
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgb(55 65 81);
+  }
 }

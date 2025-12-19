@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Moon, Sun, Settings, Minimize2, Maximize2, BarChart3, Users, Copy, X, Lock, Unlock, DoorOpen, LogOut, Calendar, Grid, Loader2, Mail } from 'lucide-react';
+import { Plus, Moon, Sun, Settings, Minimize2, Maximize2, BarChart3, Users, Copy, X, Lock, Unlock, DoorOpen, LogOut, Calendar, Grid, Loader2, Mail, Menu } from 'lucide-react';
 import { supabase, type Reminder, type Room, type Priority } from './lib/supabase';
 import { ReminderCard } from './components/ReminderCard';
 import { ExpiredPanel } from './components/ExpiredPanel';
@@ -1718,10 +1718,10 @@ export function ReminderApp() {
   const lobbyHeader = (
     <div className="text-center space-y-3">
       <p className="text-xs uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400">Salas disponibles</p>
-      <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+      <h1 className="text-2xl md:text-4xl font-bold text-gray-900 dark:text-white">
         Selecciona una sala para tus recordatorios
       </h1>
-      <p className="text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+      <p className="text-sm md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
         Haz clic en cualquier tarjeta para entrar. Si la sala está protegida te pediremos el código correspondiente.
       </p>
     </div>
@@ -1750,26 +1750,27 @@ export function ReminderApp() {
           </div>
         )}
         {/* Header con Logo, Email y Logout - Full Width */}
-        <div className="flex justify-between items-center px-6 py-6">
+        {/* Header con Logo, Email y Logout - Responsive */}
+        <div className="flex flex-col sm:flex-row justify-between items-center px-4 py-4 md:px-6 md:py-6 gap-4 sm:gap-0">
           <img
             src="/Logo Mi Gusto 2025.png"
             alt="Logo Mi Gusto"
-            className="h-16 w-auto object-contain drop-shadow-md"
+            className="h-12 md:h-16 w-auto object-contain drop-shadow-md"
           />
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center gap-3 md:gap-4 w-full sm:w-auto">
             {user?.email && (
-              <div className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              <div className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
+                <p className="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-200 truncate max-w-[200px]">
                   {user.email}
                 </p>
               </div>
             )}
             <button
               onClick={() => signOut()}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm"
+              className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm"
               title="Cerrar sesión"
             >
-              <LogOut size={18} />
+              <LogOut size={16} className="md:w-[18px] md:h-[18px]" />
               Cerrar sesión
             </button>
           </div>
@@ -1786,7 +1787,7 @@ export function ReminderApp() {
                   Ingresa el código de la sala para acceder directamente.
                 </p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
                   value={roomCodeInput}
@@ -1827,10 +1828,10 @@ export function ReminderApp() {
               {lastRoomCode && (
                 <button
                   onClick={handleResumeLastRoom}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-sm"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 md:py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300 font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-xs md:text-sm whitespace-normal text-center h-auto min-h-[44px]"
                 >
-                  <Users size={16} />
-                  Reanudar mi sala guardada ({lastRoomCode})
+                  <Users size={16} className="flex-shrink-0" />
+                  <span className="break-words max-w-[90%]">Reanudar mi sala guardada ({lastRoomCode})</span>
                 </button>
               )}
             </div>
@@ -2063,40 +2064,53 @@ export function ReminderApp() {
         </div>
       )}
 
-      <div className="h-[100dvh] flex flex-col">
-        <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-b-2 border-gray-200 dark:border-gray-700 px-6 py-4 shadow-sm">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <img
-                src="/Logo Mi Gusto 2025.png"
-                alt="Logo Mi Gusto"
-                className="h-10 w-auto object-contain"
-              />
-              <div className="w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
-              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700">
-                {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+      <div className="h-[100dvh] w-full flex flex-col overflow-x-hidden">
+        <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-b-2 border-gray-200 dark:border-gray-700 px-4 py-3 md:px-6 md:py-4 shadow-sm z-20 relative">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3 justify-between sm:justify-start">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/Logo Mi Gusto 2025.png"
+                  alt="Logo Mi Gusto"
+                  className="h-8 md:h-10 w-auto object-contain"
+                />
+                <div className="hidden sm:block w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
+                <div className="hidden sm:block text-sm font-medium text-gray-500 dark:text-gray-400 px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700">
+                  {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </div>
               </div>
-              <div className="hidden sm:block w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700">
+
+              <div className="flex items-center gap-2">
+                {/* Mobile Date (Small) */}
+                <div className="sm:hidden text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md">
+                  {new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                </div>
+
+                <div className="flex items-center gap-2 px-2 py-1 md:px-3 md:py-2 rounded-xl bg-white/70 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 max-w-[150px] md:max-w-xs overflow-hidden">
                   {roomInfo?.is_locked ? (
-                    <Lock size={18} className="text-red-500" />
+                    <Lock size={14} className="text-red-500 flex-shrink-0" />
                   ) : (
-                    <Unlock size={18} className="text-green-500" />
+                    <Unlock size={14} className="text-green-500 flex-shrink-0" />
                   )}
-                  <div className="text-left">
-                    <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Sala actual</p>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  <div className="text-left min-w-0">
+                    <p className="hidden md:block text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Sala actual</p>
+                    <p className="text-xs md:text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                       {roomInfo?.name ?? 'Sala seleccionada'}
                     </p>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar w-full lg:w-auto pb-1 sm:pb-0">
+              <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar">
                 <button
                   onClick={() => handleLeaveRoom(false)}
-                  className="flex items-center gap-3 px-6 py-3 rounded-xl border-2 border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-base font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+                  className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-xs md:text-sm font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
                 >
-                  <DoorOpen size={24} />
-                  Cambiar sala
+                  <DoorOpen size={18} />
+                  <span className="hidden sm:inline">Cambiar sala</span>
+                  <span className="sm:hidden">Salir</span>
                 </button>
                 {roomCode && (
                   <button
@@ -2106,130 +2120,112 @@ export function ReminderApp() {
                       try {
                         if (navigator.clipboard && navigator.clipboard.writeText) {
                           await navigator.clipboard.writeText(roomCode);
-                          setCopyConfirmMessage('✓ Código copiado al portapapeles');
-                          setTimeout(() => {
-                            setCopyConfirmMessage(null);
-                          }, 3000);
+                          setCopyConfirmMessage('✓ Copiado');
+                          setTimeout(() => setCopyConfirmMessage(null), 3000);
                         } else {
-                          // Fallback para navegadores que no soportan clipboard API
+                          // Fallback
                           const textArea = document.createElement('textarea');
                           textArea.value = roomCode;
-                          textArea.style.position = 'fixed';
-                          textArea.style.opacity = '0';
                           document.body.appendChild(textArea);
                           textArea.select();
-                          try {
-                            document.execCommand('copy');
-                            setCopyConfirmMessage('✓ Código copiado al portapapeles');
-                            setTimeout(() => {
-                              setCopyConfirmMessage(null);
-                            }, 3000);
-                          } catch (err) {
-                            setCopyConfirmMessage('✗ No se pudo copiar el código');
-                            setTimeout(() => {
-                              setCopyConfirmMessage(null);
-                            }, 3000);
-                          }
+                          document.execCommand('copy');
                           document.body.removeChild(textArea);
+                          setCopyConfirmMessage('✓ Copiado');
+                          setTimeout(() => setCopyConfirmMessage(null), 3000);
                         }
                       } catch (err) {
-                        console.error('Error al copiar:', err);
-                        setCopyConfirmMessage('✗ Error al copiar el código');
-                        setTimeout(() => {
-                          setCopyConfirmMessage(null);
-                        }, 3000);
+                        setCopyConfirmMessage('✗ Error');
+                        setTimeout(() => setCopyConfirmMessage(null), 3000);
                       }
                     }}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs font-mono uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all cursor-pointer"
-                    title="Copiar código de sala"
+                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs font-mono uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all cursor-pointer whitespace-nowrap"
+                    title="Copiar código"
                   >
-                    <Copy size={16} />
+                    <Copy size={14} />
                     {roomCode}
                   </button>
                 )}
-                {roomAdminEmail && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
-                    Admin: {roomAdminEmail}
-                  </span>
-                )}
               </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              {user?.email && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-                  <Mail size={16} className="text-gray-500 dark:text-gray-400" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {user.email}
-                  </span>
-                </div>
-              )}
+              <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 hidden lg:block"></div>
 
-              <button
-                onClick={() => setViewMode(viewMode === 'cards' ? 'calendar' : 'cards')}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-                title={viewMode === 'cards' ? 'Vista calendario' : 'Vista tarjetas'}
-              >
-                {viewMode === 'cards' ? (
-                  <Calendar size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
-                ) : (
-                  <Grid size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+              <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-end">
+                {user?.email && (
+                  <div className="hidden xl:flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                    <Mail size={16} className="text-gray-500 dark:text-gray-400" />
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate max-w-[150px]">
+                      {user.email}
+                    </span>
+                  </div>
                 )}
-              </button>
 
-              <button
-                onClick={() => setShowStats(!showStats)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-                title="Estadísticas"
-              >
-                <BarChart3 size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
-              </button>
+                <button
+                  onClick={() => setViewMode(viewMode === 'cards' ? 'calendar' : 'cards')}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group flex-shrink-0"
+                  title={viewMode === 'cards' ? 'Vista calendario' : 'Vista tarjetas'}
+                >
+                  {viewMode === 'cards' ? (
+                    <Calendar size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                  ) : (
+                    <Grid size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                  )}
+                </button>
 
-              <button
-                onClick={() => setShowExpiredPanel(!showExpiredPanel)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-                title={showExpiredPanel ? 'Ocultar panel' : 'Mostrar panel'}
-              >
-                {showExpiredPanel ? (
-                  <Minimize2 size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
-                ) : (
-                  <Maximize2 size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
-                )}
-              </button>
+                <button
+                  onClick={() => setShowStats(!showStats)}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group flex-shrink-0"
+                  title="Estadísticas"
+                >
+                  <BarChart3 size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                </button>
 
-              <button
-                onClick={() => setIsDark(!isDark)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title="Cambiar tema"
-              >
-                {isDark ? (
-                  <Sun size={20} className="text-yellow-500" />
-                ) : (
-                  <Moon size={20} className="text-gray-700" />
-                )}
-              </button>
+                <button
+                  onClick={() => setShowExpiredPanel(!showExpiredPanel)}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group flex-shrink-0"
+                  title={showExpiredPanel ? 'Ocultar panel' : 'Mostrar panel'}
+                >
+                  {showExpiredPanel ? (
+                    <Minimize2 size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                  ) : (
+                    <Maximize2 size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                  )}
+                </button>
 
-              <button
-                onClick={() => setShowSettingsModal(true)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-                title="Configuración (Ctrl+,)"
-              >
-                <Settings size={20} className="text-gray-700 dark:text-gray-300 group-hover:rotate-90 transition-transform duration-300" />
-              </button>
-              <button
-                onClick={signOut}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-                title="Cerrar sesión"
-              >
-                <LogOut size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" />
-              </button>
+                <button
+                  onClick={() => setIsDark(!isDark)}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                  title="Cambiar tema"
+                >
+                  {isDark ? (
+                    <Sun size={20} className="text-yellow-500" />
+                  ) : (
+                    <Moon size={20} className="text-gray-700" />
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setShowSettingsModal(true)}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group flex-shrink-0"
+                  title="Configuración"
+                >
+                  <Settings size={20} className="text-gray-700 dark:text-gray-300 group-hover:rotate-90 transition-transform duration-300" />
+                </button>
+
+                <button
+                  onClick={signOut}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group flex-shrink-0"
+                  title="Cerrar sesión"
+                >
+                  <LogOut size={20} className="text-gray-700 dark:text-gray-300 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors" />
+                </button>
+              </div>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative">
           <div className={`flex-1 overflow-hidden flex flex-col min-h-0 ${showExpiredPanel ? '' : 'mr-0'}`}>
-            <div className="p-6 space-y-4">
+            <div className="p-4 md:p-6 space-y-4">
               <div className="flex gap-4">
                 <button
                   onClick={() => {
@@ -2417,14 +2413,14 @@ export function ReminderApp() {
                 </div>
               </div>
             ) : viewMode === 'calendar' ? (
-              <div className="flex-1 overflow-y-auto px-6 pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+              <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-24 no-scrollbar">
                 <CalendarView
                   reminders={activeReminders}
                   onReminderClick={setExpandedReminder}
                 />
               </div>
             ) : (
-              <div className="flex-1 overflow-x-hidden overflow-y-auto px-6 pb-24 min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+              <div className="flex-1 overflow-x-hidden overflow-y-auto px-4 md:px-6 pb-24 min-h-0 no-scrollbar">
                 <div className="flex flex-wrap gap-4 content-start animate-fadeIn">
                   {activeReminders.map((reminder, index) => (
                     <div key={reminder.id} style={{ animationDelay: `${index * 0.05}s` }} className="animate-scaleIn">
@@ -2443,13 +2439,14 @@ export function ReminderApp() {
           </div>
 
           {showExpiredPanel && (
-            <div className="animate-slideDown h-full">
+            <div className="absolute inset-0 z-30 lg:static lg:z-auto animate-slideDown h-full bg-white dark:bg-gray-900 lg:bg-transparent">
               <ExpiredPanel
                 expiredReminders={expiredReminders}
                 onUpdate={handleUpdateReminder}
                 onDelete={handleDeleteReminder}
                 onUpdateProgress={handleUpdateProgress}
                 onOpenDetails={setExpandedReminder}
+                onClose={() => setShowExpiredPanel(false)}
               />
             </div>
           )}

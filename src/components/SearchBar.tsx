@@ -44,7 +44,7 @@ export function SearchBar({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -67,8 +67,8 @@ export function SearchBar({
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`px-4 py-3 rounded-xl border-2 transition-colors flex items-center gap-2
-            ${showFilters 
-              ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' 
+            ${showFilters
+              ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
               : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
         >
@@ -79,101 +79,101 @@ export function SearchBar({
 
       {showFilters && (
         <div className="flex gap-3 flex-wrap animate-fadeIn">
-        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-          <SlidersHorizontal size={18} className="text-gray-500 dark:text-gray-400" />
-          <select
-            value={filterBy}
-            onChange={(e) => onFilterChange(e.target.value as any)}
-            className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
+          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <SlidersHorizontal size={18} className="text-gray-500 dark:text-gray-400" />
+            <select
+              value={filterBy}
+              onChange={(e) => onFilterChange(e.target.value as any)}
+              className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
               bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium
               focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-          >
-            <option value="all">Todos</option>
-            <option value="active">Activos</option>
-            <option value="expired">Caducados</option>
-            <option value="today">Hoy</option>
-            <option value="week">Esta semana</option>
-          </select>
-        </div>
-
-        {onPriorityFilterChange && (
-          <div className="flex items-center gap-2 flex-1 min-w-[180px]">
-            <Filter size={18} className="text-gray-500 dark:text-gray-400" />
-            <select
-              value={priorityFilter}
-              onChange={(e) => onPriorityFilterChange(e.target.value as Priority | 'all')}
-              className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
-                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium
-                focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
             >
-              <option value="all">Todas las prioridades</option>
-              <option value="urgent">Urgente</option>
-              <option value="high">Alta</option>
-              <option value="medium">Media</option>
-              <option value="low">Baja</option>
+              <option value="all">Todos</option>
+              <option value="active">Activos</option>
+              <option value="expired">Caducados</option>
+              <option value="today">Hoy</option>
+              <option value="week">Esta semana</option>
             </select>
           </div>
-        )}
 
-        {onAssignedToFilterChange && (
-          <div className="flex items-center gap-2 flex-1 min-w-[180px]">
-            <Filter size={18} className="text-gray-500 dark:text-gray-400" />
-            <select
-              value={assignedToFilter}
-              onChange={(e) => onAssignedToFilterChange(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
+          {onPriorityFilterChange && (
+            <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+              <Filter size={18} className="text-gray-500 dark:text-gray-400" />
+              <select
+                value={priorityFilter}
+                onChange={(e) => onPriorityFilterChange(e.target.value as Priority | 'all')}
+                className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
                 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium
                 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-            >
-              <option value="">Todos los responsables</option>
-              {availableAssignees.map((assignee) => (
-                <option key={assignee} value={assignee}>{assignee}</option>
-              ))}
-            </select>
-          </div>
-        )}
+              >
+                <option value="all">Todas las prioridades</option>
+                <option value="urgent">Urgente</option>
+                <option value="high">Alta</option>
+                <option value="medium">Media</option>
+                <option value="low">Baja</option>
+              </select>
+            </div>
+          )}
 
-        {onTagFilterChange && availableTags.length > 0 && (
-          <div className="flex items-center gap-2 flex-1 min-w-[180px]">
-            <Filter size={18} className="text-gray-500 dark:text-gray-400" />
-            <select
-              value={tagFilter}
-              onChange={(e) => onTagFilterChange(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
+          {onAssignedToFilterChange && (
+            <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+              <Filter size={18} className="text-gray-500 dark:text-gray-400" />
+              <select
+                value={assignedToFilter}
+                onChange={(e) => onAssignedToFilterChange(e.target.value)}
+                className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
                 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium
                 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-            >
-              <option value="">Todas las etiquetas</option>
-              {availableTags.map((tag) => (
-                <option key={tag.id} value={tag.id}>{tag.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+              >
+                <option value="">Todos los responsables</option>
+                {availableAssignees.map((assignee) => (
+                  <option key={assignee} value={assignee}>{assignee}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-          <ArrowUpDown size={18} className="text-gray-500 dark:text-gray-400" />
-          <select
-            value={sortBy}
-            onChange={(e) => onSortChange(e.target.value as any)}
-            className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
+          {onTagFilterChange && availableTags.length > 0 && (
+            <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+              <Filter size={18} className="text-gray-500 dark:text-gray-400" />
+              <select
+                value={tagFilter}
+                onChange={(e) => onTagFilterChange(e.target.value)}
+                className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
+                bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium
+                focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+              >
+                <option value="">Todas las etiquetas</option>
+                {availableTags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>{tag.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <ArrowUpDown size={18} className="text-gray-500 dark:text-gray-400" />
+            <select
+              value={sortBy}
+              onChange={(e) => onSortChange(e.target.value as any)}
+              className="flex-1 px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
               bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium
               focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
-          >
-            <option value="created">Fecha de creación</option>
-            <option value="due_date">Fecha de vencimiento</option>
-            <option value="title">Título</option>
-            <option value="priority">Prioridad</option>
-          </select>
-          <button
-            onClick={() => onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="p-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
+            >
+              <option value="created">Fecha de creación</option>
+              <option value="due_date">Fecha de vencimiento</option>
+              <option value="title">Título</option>
+              <option value="priority">Prioridad</option>
+            </select>
+            <button
+              onClick={() => onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="p-2 rounded-lg border-2 border-gray-200 dark:border-gray-700
               bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <ArrowUpDown size={18} className={`text-gray-600 dark:text-gray-400 ${sortOrder === 'desc' ? 'rotate-180' : ''} transition-transform`} />
-          </button>
+            >
+              <ArrowUpDown size={18} className={`text-gray-600 dark:text-gray-400 ${sortOrder === 'desc' ? 'rotate-180' : ''} transition-transform`} />
+            </button>
+          </div>
         </div>
-      </div>
       )}
     </div>
   );
