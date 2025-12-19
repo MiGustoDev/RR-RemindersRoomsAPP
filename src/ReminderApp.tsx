@@ -1751,32 +1751,41 @@ export function ReminderApp() {
         )}
         {/* Header con Logo, Email y Logout - Full Width */}
         {/* Header con Logo, Email y Logout - Responsive */}
-        <div className="flex flex-col sm:flex-row justify-between items-center px-4 py-4 md:px-6 md:py-6 gap-4 sm:gap-0">
+        {/* Header con Logo, Email y Logout - Responsive */}
+        <div className="flex flex-row justify-between items-center px-3 py-3 md:px-6 md:py-6 gap-2 md:gap-4 overflow-hidden mb-6 md:mb-0">
+          {/* 1. Logo (Left) */}
           <img
             src="/Logo Mi Gusto 2025.png"
             alt="Logo Mi Gusto"
-            className="h-12 md:h-16 w-auto object-contain drop-shadow-md"
+            className="h-8 md:h-16 w-auto object-contain drop-shadow-md flex-shrink-0"
           />
-          <div className="flex flex-col sm:flex-row items-center gap-3 md:gap-4 w-full sm:w-auto">
-            {user?.email && (
-              <div className="px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm">
-                <p className="text-xs md:text-sm font-medium text-gray-700 dark:text-gray-200 truncate max-w-[200px]">
+
+          {/* 2. Email (Center - Sandwiched) */}
+          {user?.email && (
+            <div className="flex-1 flex justify-center min-w-0 px-2">
+              <div className="px-2 py-1 md:px-4 md:py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm max-w-full">
+                <p className="text-[10px] md:text-sm font-medium text-gray-700 dark:text-gray-200 truncate leading-tight text-center">
                   {user.email}
                 </p>
               </div>
-            )}
+            </div>
+          )}
+
+          {/* 3. Logout (Right) - Explicit Text */}
+          <div className="flex items-center flex-shrink-0">
             <button
               onClick={() => signOut()}
-              className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-[10px] md:text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors bg-white/50 dark:bg-black/20 backdrop-blur-sm shadow-sm whitespace-nowrap"
               title="Cerrar sesión"
             >
-              <LogOut size={16} className="md:w-[18px] md:h-[18px]" />
-              Cerrar sesión
+              <LogOut size={14} className="md:w-[18px] md:h-[18px]" />
+              <span>Cerrar sesión</span>
             </button>
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto px-6 space-y-10 pb-12 flex-1 w-full">
+        <div className="max-w-5xl mx-auto px-6 space-y-6 md:space-y-10 pb-12 flex-1 w-full">
+
           {lobbyHeader}
 
           <div className="flex justify-center">
