@@ -56,9 +56,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   
   throw new Error('Variables de entorno de Supabase no configuradas');
 } else {
-  console.log('✅ Variables de entorno encontradas');
-  console.log('URL:', supabaseUrl);
-  console.log('Key:', supabaseAnonKey.substring(0, 20) + '...');
+  // Solo mostrar logs en desarrollo
+  if (import.meta.env.DEV) {
+    console.log('✅ Variables de entorno encontradas');
+    console.log('URL:', supabaseUrl);
+    console.log('Key:', supabaseAnonKey.substring(0, 20) + '...');
+  }
   
   // Verificar que la URL sea válida
   if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {

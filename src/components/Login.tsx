@@ -76,7 +76,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
             <div className="text-center space-y-3">
               <div className="flex justify-center mb-4">
                 <img
-                  src="/Logo Mi Gusto 2025.png"
+                  src={`${import.meta.env.BASE_URL}Logo Mi Gusto 2025.png`}
                   alt="Logo Mi Gusto"
                   className="h-24 w-auto object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-300"
                 />

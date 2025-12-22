@@ -119,13 +119,15 @@ export function ReminderApp() {
     };
   }, [user]);
 
-  // Debug: Ver cuando cambia el estado del modal
+  // Debug: Ver cuando cambia el estado del modal (solo en desarrollo)
   useEffect(() => {
-    console.log('🔍 Estado del modal de privacidad:', {
-      showPrivacyChangePrompt,
-      roomPendingPrivacyChange: roomPendingPrivacyChange?.name,
-      roomCode
-    });
+    if (import.meta.env.DEV) {
+      console.log('🔍 Estado del modal de privacidad:', {
+        showPrivacyChangePrompt,
+        roomPendingPrivacyChange: roomPendingPrivacyChange?.name,
+        roomCode
+      });
+    }
   }, [showPrivacyChangePrompt, roomPendingPrivacyChange, roomCode]);
 
   const fetchAvailableTags = async (targetRoomCode: string) => {
@@ -651,59 +653,76 @@ export function ReminderApp() {
       e.stopPropagation();
     }
 
-    console.log('🔒 handleToggleRoomPrivacy llamado', {
-      roomCode,
-      roomCodeMatch: room.code,
-      user: user?.id,
-      roomUserId: room.user_id,
-      isLocked: room.is_locked,
-      codesMatch: roomCode === room.code
-    });
+    // Solo mostrar logs de debug en desarrollo
+    if (import.meta.env.DEV) {
+      console.log('🔒 handleToggleRoomPrivacy llamado', {
+        roomCode,
+        roomCodeMatch: room.code,
+        user: user?.id,
+        roomUserId: room.user_id,
+        isLocked: room.is_locked,
+        codesMatch: roomCode === room.code
+      });
+    }
 
     // IMPORTANTE: Solo permitir cambiar privacidad desde dentro de la sala
     // Verificamos que estemos en una sala (roomCode existe) y que sea la misma sala
     if (!roomCode) {
-      console.warn('❌ No hay roomCode');
+      if (import.meta.env.DEV) {
+        console.warn('❌ No hay roomCode');
+      }
       setRoomActionMessage('Debes estar dentro de una sala para cambiar su privacidad.');
       return;
     }
 
     if (roomCode !== room.code) {
-      console.warn('❌ Los códigos no coinciden', { roomCode, roomCodeMatch: room.code });
+      if (import.meta.env.DEV) {
+        console.warn('❌ Los códigos no coinciden', { roomCode, roomCodeMatch: room.code });
+      }
       setRoomActionMessage('Solo puedes cambiar la privacidad desde dentro de la sala.');
       return;
     }
 
     if (!user) {
-      console.warn('❌ No hay usuario');
+      if (import.meta.env.DEV) {
+        console.warn('❌ No hay usuario');
+      }
       setRoomActionMessage('Debes iniciar sesión para cambiar la privacidad de la sala.');
       return;
     }
 
     // Verificar que el usuario sea el creador de la sala
     if (room.user_id !== user.id) {
-      console.warn('❌ El usuario no es el creador', { roomUserId: room.user_id, userId: user.id });
+      if (import.meta.env.DEV) {
+        console.warn('❌ El usuario no es el creador', { roomUserId: room.user_id, userId: user.id });
+      }
       setRoomActionMessage('Solo el creador de la sala puede cambiar su privacidad.');
       return;
     }
 
     // Si está cambiando de pública a privada, SIEMPRE pedir código
     if (!room.is_locked) {
-      console.log('✅ Abriendo modal para cambiar a privada');
+      if (import.meta.env.DEV) {
+        console.log('✅ Abriendo modal para cambiar a privada');
+      }
       setRoomPendingPrivacyChange(room);
       setShowPrivacyChangePrompt(true);
       setPrivacyAccessCodeInput('');
       setPrivacyAccessError(null);
-      console.log('✅ Estados actualizados', {
-        showPrivacyChangePrompt: true,
-        roomPendingPrivacyChange: room.name
-      });
+      if (import.meta.env.DEV) {
+        console.log('✅ Estados actualizados', {
+          showPrivacyChangePrompt: true,
+          roomPendingPrivacyChange: room.name
+        });
+      }
       return;
     }
 
     // Si está cambiando de privada a pública, pedir código de acceso
     if (room.is_locked) {
-      console.log('✅ Abriendo modal para cambiar a pública');
+      if (import.meta.env.DEV) {
+        console.log('✅ Abriendo modal para cambiar a pública');
+      }
       setRoomPendingMakePublic(room);
       setShowMakePublicPrompt(true);
       setMakePublicCodeInput('');
@@ -1755,7 +1774,7 @@ export function ReminderApp() {
         <div className="flex flex-row justify-between items-center px-3 py-3 md:px-6 md:py-6 gap-2 md:gap-4 overflow-hidden mb-6 md:mb-0">
           {/* 1. Logo (Left) */}
           <img
-            src="/Logo Mi Gusto 2025.png"
+            src={`${import.meta.env.BASE_URL}Logo Mi Gusto 2025.png`}
             alt="Logo Mi Gusto"
             className="h-8 md:h-16 w-auto object-contain drop-shadow-md flex-shrink-0"
           />
@@ -2079,7 +2098,7 @@ export function ReminderApp() {
             <div className="flex flex-wrap items-center gap-3 justify-between sm:justify-start">
               <div className="flex items-center gap-3">
                 <img
-                  src="/Logo Mi Gusto 2025.png"
+                  src={`${import.meta.env.BASE_URL}Logo Mi Gusto 2025.png`}
                   alt="Logo Mi Gusto"
                   className="h-8 md:h-10 w-auto object-contain"
                 />
@@ -2641,18 +2660,20 @@ export function ReminderApp() {
       )}
 
       {expandedReminder && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <ReminderCard
-            reminder={expandedReminder}
-            onUpdate={handleUpdateReminder}
-            onDelete={handleDeleteReminder}
-            isExpanded
-            onCloseDetails={handleCloseExpandedReminder}
-            onUpdateProgress={handleUpdateProgress}
-            isExpired={
-              !!expandedReminder.due_date && new Date(expandedReminder.due_date) < new Date()
-            }
-          />
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn overflow-y-auto">
+          <div className="my-8">
+            <ReminderCard
+              reminder={expandedReminder}
+              onUpdate={handleUpdateReminder}
+              onDelete={handleDeleteReminder}
+              isExpanded
+              onCloseDetails={handleCloseExpandedReminder}
+              onUpdateProgress={handleUpdateProgress}
+              isExpired={
+                !!expandedReminder.due_date && new Date(expandedReminder.due_date) < new Date()
+              }
+            />
+          </div>
         </div>
       )}
 

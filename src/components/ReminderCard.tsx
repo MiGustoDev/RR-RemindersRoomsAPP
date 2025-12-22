@@ -368,14 +368,14 @@ useEffect(() => {
 
   return (
     <div
-      className={`flex-shrink-0 ${isExpanded ? 'w-full max-w-3xl' : 'w-72'} rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-2 ${borderColor}
+      className={`flex-shrink-0 ${isExpanded ? 'w-full max-w-3xl max-h-[90vh]' : 'w-72'} rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-2 ${borderColor}
       ${isExpired || isOverdue
         ? 'bg-red-50 dark:bg-red-900/20'
         : 'bg-white dark:bg-gray-800'
-      } cursor-pointer`}
+      } cursor-pointer ${isExpanded ? 'overflow-hidden flex flex-col' : ''}`}
       onClick={handleCardClick}
     >
-      <div className="p-5 h-full flex flex-col min-h-[240px]">
+      <div className={`p-5 h-full flex flex-col ${isExpanded ? 'min-h-0 overflow-y-auto' : 'min-h-[240px]'}`}>
         {isEditing ? (
           <>
             <input

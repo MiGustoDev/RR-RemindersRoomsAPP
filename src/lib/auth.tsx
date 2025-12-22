@@ -28,12 +28,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Si parece haber sesión, damos un tiempo razonable (2s). Si no, fallamos casi de inmediato (0.5s).
     const timeoutDuration = hasStoredSession ? 2000 : 500;
 
-    console.log(`🕒 Iniciando verificación de sesión (Timeout: ${timeoutDuration}ms, Storage: ${hasStoredSession ? 'Sí' : 'No'})`);
+    // Solo mostrar logs en desarrollo
+    if (import.meta.env.DEV) {
+      console.log(`🕒 Iniciando verificación de sesión (Timeout: ${timeoutDuration}ms, Storage: ${hasStoredSession ? 'Sí' : 'No'})`);
+    }
 
     // Timeout de seguridad
     timeoutId = setTimeout(() => {
       if (mounted) {
-        console.warn('⚠️ Timeout al obtener sesión. Continuando sin autenticación...');
+        if (import.meta.env.DEV) {
+          console.warn('⚠️ Timeout al obtener sesión. Continuando sin autenticación...');
+        }
         setLoading(false);
       }
     }, timeoutDuration);
@@ -47,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           console.error('❌ Error obteniendo sesión:', error);
-        } else {
+        } else if (import.meta.env.DEV) {
           console.log('✅ Sesión obtenida:', session ? 'Usuario autenticado' : 'Sin sesión');
         }
 
@@ -69,7 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return;
 
-      console.log('🔄 Cambio de estado de autenticación:', _event);
+      // Solo mostrar logs en desarrollo, y solo para eventos importantes
+      if (import.meta.env.DEV && (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT' || _event === 'TOKEN_REFRESHED')) {
+        console.log('🔄 Cambio de estado de autenticación:', _event);
+      }
       // Solo actualizamos si el timeout no ha expirado ya (para evitar parpadeos)
       // o si es un evento explícito de inicio/cierre de sesión
       if (_event === 'SIGNED_IN' || _event === 'SIGNED_OUT') {
