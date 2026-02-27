@@ -78,6 +78,8 @@ Permite organizar tareas por áreas, asignarlas a personas, aplicar prioridades 
 
 ## Desarrolladores
 
-- **Facu14carrizo**
-- **ramirolacci**
+- **[Facu14carrizo](https://github.com/Facu14carrizo)** · [LinkedIn](https://www.linkedin.com/in/facu14carrizo/)
+- **[ramirolacci](https://github.com/ramirolacci)** · [LinkedIn](https://www.linkedin.com/in/ramiro-lacci/)
+
+
 
