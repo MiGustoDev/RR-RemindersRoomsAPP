@@ -1,85 +1,90 @@
-# Rooms – Reminders & Rooms
+<div align="center">
 
-Aplicación interna de Mi Gusto para gestionar **recordatorios compartidos por salas** (rooms) con integración a **Supabase**, paneles de control y vistas avanzadas (tarjetas, calendario y diagrama de Gantt).
+  <h1>✨ Reminders & Rooms (RR)</h1>
+  <p><b>Plataforma interna de gestión inteligente de recordatorios compartidos por salas para Mi Gusto</b></p>
 
-Permite organizar tareas por áreas, asignarlas a personas, aplicar prioridades y etiquetas, ver estadísticas y gestionar el acceso a cada sala.
+  <p>
+    <img src="https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
+    <img src="https://img.shields.io/badge/TypeScript-5.5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Vite-5.4-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+    <img src="https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
+    <img src="https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
+  </p>
 
-## Demo
+</div>
 
-### Login
+---
 
-![Pantalla de login](public/assets/Login.png)
+## 🚀 Visión General
 
-### Inicio
+**Reminders & Rooms** es una aplicación colaborativa diseñada para optimizar la organización y seguimiento de tareas en equipo. Permite gestionar salas virtuales (*rooms*) independientes, delegar recordatorios a personas específicas, definir prioridades, monitorear fechas límite y analizar la productividad mediante múltiples vistas interactivas (Tarjetas, Calendario y Diagrama de Gantt).
 
-![Pantalla de inicio](public/assets/Inicio.png)
+---
 
-### Dashboard
+## ✨ Funcionalidades Destacadas
 
-![Dashboard principal](public/assets/Dashboard.png)
+- 🔐 **Autenticación & Seguridad Avanzada**: Gestión de sesiones en tiempo real integrada con **Supabase Auth**, manejo granular de errores de acceso y persistencia segura.
+- 🏢 **Salas Colaborativas (Rooms)**: Creación de salas privadas o públicas con códigos de acceso únicos, control de miembros y sincronización en tiempo real vía WebSockets.
+- 📋 **Gestión Integral de Tareas**:
+  - Filtros avanzados por estado (activos, vencidos, hoy, semana), prioridad, etiquetas y personas asignadas.
+  - Asignación inteligente a miembros con notificaciones instantáneas mediante **EmailJS**.
+- 📊 **Múltiples Vistas Interactivas**:
+  - **Vista de Tarjetas**: Flujo dinámico y visual para trabajo diario.
+  - **Vista de Calendario**: Planificación temporal ordenada y clara.
+  - **Diagrama de Gantt**: Cronograma interactivo de dependencias y tiempos.
+- 📈 **Analítica & Panel de Estadísticas**: Métricas en tiempo real sobre la carga de trabajo del equipo y tasa de finalización de tareas.
+- 🌙 **Modo Oscuro & Experiencia Fluida**: Interfaz moderna adaptable a temas claro/oscuro con atajos de teclado intuitivos (`Ctrl+K`, `Ctrl+N`, `Ctrl+,`).
 
-### Vista en calendario
+---
 
-![Dashboard alternativo](public/assets/Dashboard2.png)
+## 🖼️ Galería de Imágenes
 
-## Características principales
+<table align="center" width="100%">
+  <tr>
+    <td width="50%" align="center">
+      <img src="src/screenshots/Screenshot_1.png" alt="Panel Principal y Gestión de Salas" width="100%"/>
+      <br/>
+      <sub><b>Panel Principal & Salas Colaborativas</b></sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="src/screenshots/Screenshot_2.png" alt="Control de Tareas y Filtros" width="100%"/>
+      <br/>
+      <sub><b>Control de Tareas & Filtros Avanzados</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="src/screenshots/Screenshot_3.png" alt="Vista en Calendario" width="100%"/>
+      <br/>
+      <sub><b>Vista en Calendario & Programación</b></sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="src/screenshots/Screenshot_4.png" alt="Estadísticas y Diagrama de Gantt" width="100%"/>
+      <br/>
+      <sub><b>Diagrama de Gantt & Panel de Métricas</b></sub>
+    </td>
+  </tr>
+</table>
 
-- **Autenticación con Supabase**
-  - Login por correo y contraseña.
-  - Manejo de errores detallado (credenciales inválidas, email sin confirmar, problemas de conexión, etc.).
-  - Persistencia de sesión y compatibilidad con `localStorage`.
+---
 
-- **Gestión de salas (rooms)**
-  - Creación de salas con código único y código de acceso.
-  - Distinción entre salas propias y salas donde el usuario es miembro.
-  - Control de privacidad y bloqueo/desbloqueo de salas.
-  - Escucha en tiempo real de cambios en las salas mediante canales de Supabase.
+## 🛠️ Stack Tecnológico
 
-- **Gestión de recordatorios**
-  - Creación, edición y eliminación de recordatorios por sala.
-  - Campos: título, descripción, fecha de vencimiento, prioridad, asignado a, etiquetas, etc.
-  - Panel de recordatorios vencidos.
-  - Filtros por estado (activos, vencidos, hoy, semana), prioridad, persona, etiquetas y texto de búsqueda.
-  - Ordenamiento configurable (fecha de creación, vencimiento, título, prioridad).
+- **Core & UI**: [React 18](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite](https://vitejs.dev/)
+- **Estilos & Diseño**: [Tailwind CSS](https://tailwindcss.com/), [Lucide React](https://lucide.dev/) (iconografía)
+- **Visualización**: [Frappe Gantt](https://github.com/frappe/gantt) (diagramas cronológicos)
+- **Backend & Realtime**: [Supabase](https://supabase.com/) (Auth, PostgreSQL Database & Realtime Channels)
+- **Notificaciones**: [EmailJS](https://www.emailjs.com/) (Emailing automatizado)
 
-- **Vistas y paneles**
-  - Vista de tarjetas (cards) para trabajo diario.
-  - Vista de calendario.
-  - Vista tipo Gantt utilizando `frappe-gantt`.
-  - Panel de estadísticas (`StatsPanel`) con métricas de uso y carga de trabajo.
+---
 
-- **Gestión de personas y etiquetas**
-  - Selector de persona (`PersonSelector`) y gestor de personas (`PeopleManager`) para asignar tareas.
-  - Selector de etiquetas (`TagSelector`) y gestión de tags almacenadas por sala.
+## 👥 Equipo de Desarrollo
 
-- **Notificaciones por email**
-  - Integración con **EmailJS** para enviar correos de asignación de recordatorios (`sendAssignmentEmail`).
+<div align="center">
 
-- **Experiencia de usuario**
-  - Modo claro/oscuro controlado por `useDarkMode`.
-  - Atajos de teclado (por ejemplo `Ctrl+K` para búsqueda, `Ctrl+N` para nuevo recordatorio, `Ctrl+,` para configuración).
-  - Animaciones y diseño moderno construido con **Tailwind CSS**.
+| Desarrollador | Enlaces |
+| :--- | :--- |
+| **Facundo Carrizo** | [![GitHub](https://img.shields.io/badge/GitHub-Facu14carrizo-181717?logo=github)](https://github.com/Facu14carrizo) [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?logo=linkedin)](https://www.linkedin.com/in/facu14carrizo/) |
+| **Ramiro Lacci** | [![GitHub](https://img.shields.io/badge/GitHub-ramirolacci-181717?logo=github)](https://github.com/ramirolacci) [![LinkedIn](https://img.shields.io/badge/LinkedIn-Perfil-0A66C2?logo=linkedin)](https://www.linkedin.com/in/ramiro-lacci/) |
 
-## Tecnologías utilizadas
-
-- **Frontend**
-  - [React 18](https://react.dev/)
-  - [TypeScript](https://www.typescriptlang.org/)
-  - [Vite](https://vitejs.dev/) (ver `vite.config.ts`)
-  - [Tailwind CSS](https://tailwindcss.com/)
-  - [lucide-react](https://lucide.dev/) para iconos
-  - [frappe-gantt](https://github.com/frappe/gantt) para la vista Gantt
-
-- **Backend como servicio**
-  - [Supabase](https://supabase.com/) para autenticación, base de datos, funciones en tiempo real y almacenamiento de datos de salas/recordatorios.
-
-- **Email**
-  - [EmailJS](https://www.emailjs.com/) para el envío de correos de notificación.
-
-## Desarrolladores
-
-- **[Facu14carrizo](https://github.com/Facu14carrizo)** · [LinkedIn](https://www.linkedin.com/in/facu14carrizo/)
-- **[ramirolacci](https://github.com/ramirolacci)** · [LinkedIn](https://www.linkedin.com/in/ramiro-lacci/)
-
-
-
+</div>
